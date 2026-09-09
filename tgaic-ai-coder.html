@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0024</title>
+<title>TGAIC AI Coder v0026</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -244,6 +244,7 @@ footer{
     </div>
     <div class="controls">
       <span class="badge" id="statusBadge">Not connected</span>
+      <button id="referencesBtn" type="button" title="Open TGAIC architecture and terminology references">References</button>
       <button id="helpBtn" type="button">Help</button>
       <button id="newChatBtn" type="button">New Chat</button>
     </div>
@@ -406,6 +407,170 @@ footer{
 </div>
 
 
+
+<div id="referencesBack" class="modalback" role="dialog" aria-modal="true" aria-labelledby="referencesTitle">
+  <div class="helpModal">
+    <div class="helpHead">
+      <strong id="referencesTitle">TGAIC References — Architecture &amp; Terminology</strong>
+      <span class="spacer"></span>
+      <button id="closeReferencesTop" type="button">Close</button>
+    </div>
+    <div class="helpScroll">
+
+      <p>This reference explains the pieces behind TGAIC and the terminology you will encounter while selecting and running local AI models.</p>
+
+      <div class="setupSection">
+        <h3>1. TGAIC architecture at a glance</h3>
+        <pre>TGAIC browser UI
+tgaic-ai-coder.html
+        │
+        │ OpenAI-compatible HTTP requests
+        ▼
+TGAIC PowerShell Bridge
+127.0.0.1:8787
+        │
+        │ proxy / CORS / helper endpoints
+        ▼
+llama-server (part of llama.cpp)
+127.0.0.1:8080
+        │
+        │ loads and runs
+        ▼
+GGUF model
+Qwen / Llama / Gemma / other supported family
+        │
+        └── model weights + tokenizer + metadata
+
+Optional online path:
+TGAIC → Bridge → Hugging Face Hub API
+                    │
+                    └── model discovery / repository metadata</pre>
+        <p><b>TGAIC HTML:</b> the user interface. It owns the visible conversation history and sends requests to the local bridge.</p>
+        <p><b>PowerShell bridge:</b> the browser-facing local HTTP layer. It supplies CORS headers, proxies requests, exposes model-management helpers, and performs Hugging Face discovery.</p>
+        <p><b>llama-server:</b> the server executable supplied by llama.cpp. It loads compatible models and performs inference.</p>
+        <p><b>GGUF model:</b> the actual trained model data used for inference: weights, tokenizer information, and metadata packaged for llama.cpp.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>2. What is the AI model?</h3>
+        <p>The <b>model</b> is the trained neural network that produces the answer. It contains learned numerical weights created during training. TGAIC itself does not contain that intelligence; it provides the interface and plumbing used to communicate with the model.</p>
+        <p>Examples of model families include <b>Qwen</b>, <b>Llama</b>, <b>Gemma</b>, <b>Mistral</b>, DeepSeek-derived models, and many community fine-tunes. A Hugging Face repository may contain several sizes or quantizations of the same underlying model.</p>
+        <p><b>Base model:</b> primarily trained to continue text. <b>Instruct/Chat model:</b> additionally tuned to follow prompts and respond conversationally. <b>Coder model:</b> trained or fine-tuned with additional emphasis on source code and software tasks. Instruct/chat or coder-instruct models are normally the most useful choices for TGAIC.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>3. Llama vs llama.cpp vs llama-server</h3>
+        <p>The similar names are confusing, but these are different things:</p>
+        <ul>
+          <li><b>Llama</b> — a family of AI models released by Meta. A Llama GGUF is one possible model TGAIC can run.</li>
+          <li><b>llama.cpp</b> — an open-source C/C++ inference runtime. It is <b>not an AI model</b>. It can run many supported model families, not just Llama.</li>
+          <li><b>llama-server</b> — a server executable included with llama.cpp. TGAIC uses it to expose the locally loaded model through HTTP/OpenAI-compatible endpoints.</li>
+        </ul>
+        <p>In the current TGAIC architecture, llama.cpp/llama-server is the engine and the GGUF file is the model.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>4. GGUF and quantization</h3>
+        <p><b>GGUF</b> is the model file format used by llama.cpp. It packages model tensors together with metadata and tokenizer information so the runtime can load the model.</p>
+        <p><b>Quantization</b> stores model weights at reduced numerical precision. This makes a model smaller and reduces memory requirements, usually with some trade-off in model quality.</p>
+        <ul>
+          <li><b>Q8</b> — relatively high precision and larger memory/file requirements.</li>
+          <li><b>Q5 / Q6</b> — middle ground between size and retained precision.</li>
+          <li><b>Q4_K_M</b> — a common practical balance of size, quality, and local hardware requirements.</li>
+          <li><b>Q3 / Q2</b> — progressively smaller, but with greater potential quality loss.</li>
+        </ul>
+        <p>Quantization and parameter count are separate concepts. A 7B Q4 model and a 3B Q4 model can have the same quantization family while still being very different in size and capability.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>5. Hugging Face and the Hugging Face Hub API</h3>
+        <p><b>Hugging Face</b> is an online ecosystem for hosting and sharing models, datasets, model cards, and related files. TGAIC uses Hugging Face primarily as a catalog for discovering GGUF repositories.</p>
+        <p>The <b>Hugging Face Hub API</b> is the programmatic interface used by the TGAIC bridge for model discovery. The bridge can search repository metadata and inspect repository files without scraping a normal web search-results page.</p>
+        <p>A model repository can contain the model card/documentation, multiple GGUF quantizations, configuration information, and optional companion files such as multimodal projectors.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>6. Inference, tokens, and tokenization</h3>
+        <p><b>Inference</b> means running an already-trained model to generate an answer. Training creates or changes model weights; inference uses those existing weights.</p>
+        <p>Models process <b>tokens</b>, not words exactly as they appear on screen. A <b>tokenizer</b> converts text into token IDs. A token may represent a whole word, part of a word, punctuation, whitespace, or another text unit.</p>
+        <pre>Your prompt
+   │
+   ▼
+Tokenizer
+   │
+   ▼
+Model inference
+   │
+   ▼
+next-token probabilities
+   │
+   ▼
+chosen token
+   │
+   └── repeated until the response completes</pre>
+        <p>Generation is iterative: the model predicts a next token, that token becomes part of the active context, and the process repeats.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>7. Context window, KV cache, and generation</h3>
+        <p><b>Context window:</b> the active token capacity the model/runtime can consider at one time. It includes system instructions, conversation history, the current prompt, and generated tokens.</p>
+        <p><b>Prompt tokens:</b> tokens supplied to the model. <b>Completion tokens:</b> tokens generated by the model.</p>
+        <p><b>KV cache:</b> runtime memory that preserves attention state for the active context. Increasing context length can therefore increase memory usage even when the GGUF file itself has not changed.</p>
+        <p><b>Temperature:</b> a generation setting that influences randomness. Lower values generally make generation more deterministic; higher values allow more variation.</p>
+        <p><b>Sampling:</b> the strategy used to select the next token from the model's probability distribution.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>8. GPU VRAM, system RAM, model size, and offload</h3>
+        <p>A GGUF model does <b>not always need to fit completely inside GPU VRAM</b>. llama.cpp can place some model layers/work on the GPU and leave the remainder in system RAM for CPU processing.</p>
+        <ul>
+          <li><b>GPU VRAM:</b> fast memory attached to the GPU. More VRAM generally allows more model work to remain on the GPU.</li>
+          <li><b>System RAM:</b> can hold model data that does not fit in VRAM, allowing models larger than the GPU's memory to run.</li>
+          <li><b>GGUF file size:</b> a useful sizing signal, but it is not identical to total runtime memory consumption.</li>
+          <li><b>GPU offload:</b> assigning selected model layers or computation to the GPU while other portions remain CPU/system-memory based.</li>
+          <li><b>Runtime overhead:</b> context/KV cache, working buffers, the operating system, and other processes also consume memory.</li>
+        </ul>
+        <p>This is why a machine with 2 GB of VRAM can sometimes run a GGUF larger than 2 GB. It may simply be using a mixture of GPU VRAM, system RAM, and CPU inference. Whether it is fast enough is a separate question.</p>
+        <p>TGAIC's model-size filter is therefore a discovery aid, not a guarantee that a model will load, fit comfortably, or perform well on a particular computer.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>9. Additional terminology</h3>
+        <p><b>LLM:</b> Large Language Model — a neural network trained to model and generate sequences of tokens.</p>
+        <p><b>Parameters:</b> learned numerical values inside a model. Names such as 3B, 7B, or 14B roughly indicate billions of parameters.</p>
+        <p><b>Weights:</b> the learned parameter values stored in the model.</p>
+        <p><b>Training:</b> the process that adjusts model weights from data. Normal TGAIC chat does not train the model.</p>
+        <p><b>Fine-tune:</b> additional training used to specialize an existing model for a domain, task, or behavior.</p>
+        <p><b>LoRA:</b> a parameter-efficient adapter technique that can modify model behavior without retraining/replacing every base-model weight.</p>
+        <p><b>Prompt:</b> the input and instructions sent to the model.</p>
+        <p><b>Embedding:</b> a numerical vector representation of content, often used for similarity search and retrieval.</p>
+        <p><b>RAG:</b> Retrieval-Augmented Generation — retrieving relevant reference material and adding it to the model context before generation.</p>
+        <p><b>Multimodal:</b> a model that can work with more than text, such as images. Some llama.cpp multimodal models use an <code>mmproj</code> companion file.</p>
+        <p><b>API:</b> Application Programming Interface. TGAIC communicates through HTTP APIs between the browser, bridge, and llama-server.</p>
+        <p><b>CORS:</b> browser cross-origin security rules. The TGAIC bridge supplies the browser-facing CORS headers needed by the local HTML UI.</p>
+      </div>
+
+      <div class="setupSection">
+        <h3>10. Official references and further reading</h3>
+        <ul>
+          <li><a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener noreferrer">llama.cpp project ↗</a> — official inference-runtime repository.</li>
+          <li><a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md" target="_blank" rel="noopener noreferrer">llama-server documentation ↗</a> — server operation, HTTP endpoints, model loading, and runtime options.</li>
+          <li><a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/models.md" target="_blank" rel="noopener noreferrer">llama.cpp model guide ↗</a> — obtaining, converting, quantizing, and loading models.</li>
+          <li><a href="https://huggingface.co/models?library=gguf" target="_blank" rel="noopener noreferrer">Hugging Face GGUF models ↗</a> — browse GGUF repositories.</li>
+          <li><a href="https://huggingface.co/docs/hub/gguf" target="_blank" rel="noopener noreferrer">Hugging Face GGUF documentation ↗</a> — GGUF support on the Hub.</li>
+          <li><a href="https://huggingface.co/docs/hub/models" target="_blank" rel="noopener noreferrer">Hugging Face model repositories ↗</a> — how models and model cards are organized.</li>
+          <li><a href="https://huggingface.co/docs/hub/api" target="_blank" rel="noopener noreferrer">Hugging Face Hub API ↗</a> — official programmatic Hub API documentation.</li>
+          <li><a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/multimodal.md" target="_blank" rel="noopener noreferrer">llama.cpp multimodal guide ↗</a> — supported multimodal models and projector companions.</li>
+        </ul>
+      </div>
+
+    </div>
+    <div class="helpActions">
+      <button id="closeReferences" class="primary" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="helpBack" class="modalback" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="helpModal">
     <div class="helpHead">
@@ -415,7 +580,7 @@ footer{
     </div>
     <div class="helpScroll">
 
-        <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0025.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
+        <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0026.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
         <p class="note"><b>Run the downloaded HTML locally:</b> the GitHub Pages copy is not the normal TGAIC runtime. Because GitHub Pages is HTTPS and the TGAIC bridge is normally plain HTTP on <code>127.0.0.1:8787</code>, modern browser mixed-content/private-network rules may block the hosted page from reaching the bridge. Download <code>tgaic-ai-coder.html</code>, then double-click the local file.</p>
         <p><b>Architecture.</b> TGAIC uses a <b>single-file browser UI</b>, but the complete local runtime also requires the PowerShell bridge and llama.cpp. TGAIC is therefore local-first and dependency-light, but unlike TGG Grid it is not a browser-only Single-File Local Application. TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
 
@@ -486,7 +651,7 @@ where llama-server</pre>
         <p><code>-hf</code> is convenient for downloading/running a Hugging Face GGUF repository; <code>-m</code> is useful when you want explicit control over a local GGUF file.</p>
 
         <p><b>4. Start the TGAIC PowerShell bridge.</b> Put the bridge PS1 somewhere convenient, open a second Command Prompt in that directory, and run:</p>
-        <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1</pre>
+        <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0026.ps1</pre>
         <p>The bridge should report <code>Listening : http://127.0.0.1:8787/</code> and <code>Upstream : http://127.0.0.1:8080/v1</code>. Leave this second console window running.</p>
 
         <p><b>5. Download and open TGAIC locally.</b> Download or clone the repository so you have a local copy of <code>tgaic-ai-coder.html</code>, then double-click that file. TGAIC is intentionally run directly from disk as a <code>file://</code> application. Do not rely on the GitHub Pages-hosted copy for normal bridge access. The endpoint should remain:</p>
@@ -581,7 +746,7 @@ llama-server -cl</pre>
           <p><b>Option A — HTML token field:</b> enter an Hugging Face access token in the <b>HF Token</b> field in the model browser. The page sends it only to <code>http://127.0.0.1:8787</code> in the <code>X-HF-Token</code> header. The bridge converts it to a Hugging Face Bearer token. TGAIC does not save this value to localStorage, sessionStorage, cookies, or a file; reloading or closing the page clears it.</p>
           <p><b>Option B — environment variable:</b></p>
           <pre>set HF_TOKEN=hf_your_token_here
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1</pre>
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0026.ps1</pre>
           <p>If both are present, the token entered in the HTML page takes precedence for that request. The bridge never prints the token itself.</p>
           <p><b>API efficiency:</b> the Hugging Face search response already includes model tags. The bridge first keeps only results tagged <code>gguf</code> (or clearly named as GGUF) and only then requests repository trees to discover exact GGUF filenames and sizes. This avoids a tree API call for every arbitrary model returned by the search.</p>
           <p><b>Pagination:</b> <b>Results per page</b> defaults to 10 and can be set from 1 to 100. A TGAIC page is result-oriented rather than tied one-for-one to a Hugging Face API page: the bridge follows as many Hub pages as necessary to collect the requested number of matching GGUF repositories, stopping early only when Hugging Face has no more results. The continuation cursor also remembers an offset within a Hub page so matches are not skipped between TGAIC pages.</p>
@@ -611,7 +776,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
         <div class="setupSection">
           <h3>25. Repository and project documentation</h3>
-          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0024.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0026.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
           <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
       
@@ -622,12 +787,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0024';
+const APP_VERSION='v0026';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
   chat:$('chat'),prompt:$('prompt'),send:$('sendBtn'),stop:$('stopBtn'),
-  newChat:$('newChatBtn'),help:$('helpBtn'),clearDisplay:$('clearDisplayBtn'),copyLast:$('copyLastBtn'),
+  newChat:$('newChatBtn'),help:$('helpBtn'),references:$('referencesBtn'),clearDisplay:$('clearDisplayBtn'),copyLast:$('copyLastBtn'),
   availableModel:$('availableModelSelect'),refreshModels:$('refreshModelsBtn'),loadModel:$('loadModelBtn'),unloadModel:$('unloadModelBtn'),modelTable:$('modelTableBody'),modelManagerStatus:$('modelManagerStatus'),
   hfSearch:$('hfSearch'),hfToken:$('hfToken'),hfLimit:$('hfLimit'),hfQuant:$('hfQuantFilter'),hfSize:$('hfSizeFilter'),hfType:$('hfTypeFilter'),hfSort:$('hfSort'),hfSearchBtn:$('hfSearchBtn'),hfTable:$('hfTableBody'),hfStatus:$('hfStatus'),hfCopyCache:$('hfCopyCacheBtn'),hfPrev:$('hfPrevBtn'),hfNext:$('hfNextBtn'),hfPageLabel:$('hfPageLabel')
 };
@@ -1327,11 +1492,16 @@ ui.chat.addEventListener('click',async e=>{
   }
 });
 
+ui.references.addEventListener('click',()=>{$('referencesBack').classList.add('open');});
 ui.help.addEventListener('click',()=>{$('helpBack').classList.add('open');});
+$('closeReferences').addEventListener('click',()=>{$('referencesBack').classList.remove('open');});
+$('closeReferencesTop').addEventListener('click',()=>{$('referencesBack').classList.remove('open');});
+$('referencesBack').addEventListener('click',e=>{if(e.target===$('referencesBack'))$('referencesBack').classList.remove('open');});
+
 $('closeHelp').addEventListener('click',()=>{$('helpBack').classList.remove('open');});
 $('closeHelpTop').addEventListener('click',()=>{$('helpBack').classList.remove('open');});
 $('helpBack').addEventListener('click',e=>{if(e.target===$('helpBack'))$('helpBack').classList.remove('open');});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('helpBack').classList.remove('open');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('helpBack').classList.remove('open');$('referencesBack').classList.remove('open');}});
 
 ui.hfSearchBtn.addEventListener('click',searchHuggingFace);
 ui.hfSearch.addEventListener('input',markHfSearchCriteriaChanged);
