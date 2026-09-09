@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0022</title>
+<title>TGAIC AI Coder v0023</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -500,7 +500,7 @@ llama-server -cl</pre>
         <p><b>19. Hugging Face Model Browser.</b> The online discovery panel searches GGUF repositories through the bridge. Enter a search such as <code>coder</code>, <code>Qwen</code>, or <code>Gemma</code>. Search criteria do not contact Hugging Face until you click <b>Search Models</b>. Page filling is handled by the bridge: it continues through Hub results until it has enough matching repositories for the requested TGAIC page or the Hub search is exhausted. Sort choices are only those supported by the Hugging Face model API, so sorting applies to the global Hub traversal rather than merely reordering one local page. The bridge also detects <code>mmproj</code>/MTP companion files and adds a compatibility hint. Use <b>Copy -hf</b> to copy the standard cache command plus the generated <code>llama-server -hf user/repository:quant</code> command. Downloading remains intentionally manual: stop router mode, paste/run the command, wait for the model to cache/load, stop that model with <code>Ctrl+C</code>, restart generic router mode, then use <b>Refresh Models</b>.</p>
 
         <p class="note"><b>Current recommended routine:</b> use the Hugging Face GGUF catalog to discover a model → copy its <code>user/repository:quant</code> identifier → set <code>LLAMA_CACHE=C:\Models</code> → run it once with <code>llama-server -hf ...</code> to download/cache it → Ctrl+C → restart the generic router → Refresh Models in TGAIC → Load Selected.</p>
-      </div>
+      
     
         <div class="setupSection">
           <h3>20. Hugging Face authentication, rate limits, and efficient search</h3>
@@ -538,9 +538,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
         <div class="setupSection">
           <h3>25. Repository and project documentation</h3>
-          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0022.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0023.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
           <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
+      </div>
 </details>
   </section>
 
@@ -571,7 +572,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0022';
+const APP_VERSION='v0023';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
