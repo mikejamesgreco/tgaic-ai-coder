@@ -1,0 +1,440 @@
+TGAIC AI Coder - Quick Command Reference
+The Greco AI Coder
+=========================================
+
+Purpose
+-------
+This file is a command companion for the TGAIC README, Help, and References material.
+It contains the common Windows commands used to install, start, stop, restart, and
+troubleshoot the local TGAIC runtime.
+
+TGAIC runtime path
+------------------
+TGAIC HTML
+  -> PowerShell Bridge on 127.0.0.1:8787
+  -> llama-server / llama.cpp on 127.0.0.1:8080
+  -> local GGUF model cache under C:\Models
+
+
+1. INSTALL LLAMA.CPP
+====================
+
+Install with winget:
+
+winget install llama.cpp
+
+If winget reports that PATH changed, close Command Prompt and open a new one.
+
+Verify:
+
+llama-server --version
+where llama-server
+
+
+2. STANDARD MODEL CACHE
+=======================
+
+In every new Command Prompt that will run llama.cpp, set:
+
+set LLAMA_CACHE=C:\Models
+
+This tells llama.cpp to use C:\Models as the managed model cache.
+
+
+3. DOWNLOAD / CACHE A MODEL
+===========================
+
+Stop router mode first if it is currently running.
+
+Example 1.5B model:
+
+set LLAMA_CACHE=C:\Models
+llama-server -hf Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
+
+Example 3B model:
+
+set LLAMA_CACHE=C:\Models
+llama-server -hf Qwen/Qwen2.5-Coder-3B-Instruct-GGUF:Q4_K_M
+
+Wait for the model to download and load successfully.
+
+When complete, press:
+
+Ctrl+C
+
+The model remains cached under C:\Models.
+
+
+4. START LLAMA-SERVER IN TGAIC ROUTER MODE
+==========================================
+
+Normal TGAIC startup:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Important:
+- Router mode intentionally does NOT include -hf.
+- Router mode intentionally does NOT include -m.
+- Leave this Command Prompt window running while using TGAIC.
+
+
+5. START THE TGAIC POWERSHELL BRIDGE
+====================================
+
+Open a second Command Prompt in the repository folder.
+
+Run:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+Expected bridge endpoint:
+
+http://127.0.0.1:8787/
+
+Expected upstream llama.cpp endpoint:
+
+http://127.0.0.1:8080/v1
+
+Leave this window running while using TGAIC.
+
+
+6. OPEN TGAIC
+=============
+
+Download or clone the repository.
+
+Then double-click:
+
+tgaic-ai-coder.html
+
+The supported runtime is the local file:// copy.
+
+Default TGAIC endpoint:
+
+http://127.0.0.1:8787/v1
+
+Then use:
+- Connect
+- Refresh Models
+- Load Selected
+
+
+7. NORMAL STARTUP SEQUENCE
+==========================
+
+Window 1 - llama.cpp:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Window 2 - TGAIC bridge:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+Browser:
+
+Double-click tgaic-ai-coder.html
+
+
+8. NORMAL SHUTDOWN SEQUENCE
+===========================
+
+Option A - from TGAIC:
+- Use Stop Bridge to stop the PowerShell bridge.
+- llama-server continues running separately.
+
+Option B - from console windows:
+
+Bridge console:
+Ctrl+C
+
+llama-server console:
+Ctrl+C
+
+Closing tgaic-ai-coder.html does not automatically stop either process.
+
+
+9. RESTART THE BRIDGE
+=====================
+
+Stop the existing bridge:
+
+Ctrl+C
+
+Then start it again:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+
+10. RESTART LLAMA-SERVER
+========================
+
+Stop llama-server:
+
+Ctrl+C
+
+Restart router mode:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Then return to TGAIC and use:
+
+Refresh Models
+
+Load Selected
+
+
+11. ADD ANOTHER MODEL LATER
+===========================
+
+Step 1 - stop router mode:
+
+Ctrl+C
+
+Step 2 - keep the TGAIC cache configured:
+
+set LLAMA_CACHE=C:\Models
+
+Step 3 - run the desired Hugging Face GGUF once:
+
+llama-server -hf user/repository:quant
+
+Example:
+
+llama-server -hf Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M
+
+Step 4 - wait for the model to download/load.
+
+Step 5 - stop that temporary model session:
+
+Ctrl+C
+
+Step 6 - restart generic router mode:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Step 7 - in TGAIC:
+
+Refresh Models
+Load Selected
+
+
+12. RUN A LOCAL GGUF FILE DIRECTLY
+==================================
+
+If you already have a GGUF file:
+
+llama-server -m "C:\Models\your-model.gguf" --host 127.0.0.1 --port 8080 -c 4096
+
+Use this for direct/manual model startup rather than router mode.
+
+
+13. OPTIONAL HUGGING FACE TOKEN
+===============================
+
+Set a Hugging Face token for the bridge process:
+
+set HF_TOKEN=hf_your_token_here
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+Alternative:
+Enter the token directly in the TGAIC HF Token field.
+
+TGAIC does not persist the HTML-entered token.
+
+
+14. HEALTH / TROUBLESHOOTING CHECKS
+===================================
+
+Check llama.cpp version:
+
+llama-server --version
+
+Check llama.cpp health:
+
+curl http://127.0.0.1:8080/health
+
+Check llama.cpp models:
+
+curl http://127.0.0.1:8080/v1/models
+
+Check TGAIC bridge health:
+
+curl http://127.0.0.1:8787/health
+
+Check models through the TGAIC bridge:
+
+curl http://127.0.0.1:8787/v1/models
+
+
+15. COMMON PORTS
+================
+
+llama-server:
+127.0.0.1:8080
+
+TGAIC PowerShell bridge:
+127.0.0.1:8787
+
+TGAIC API endpoint:
+http://127.0.0.1:8787/v1
+
+
+16. COMMON FILES
+================
+
+Main local UI:
+tgaic-ai-coder.html
+
+Current bridge:
+tgaic-ai-coder-bridge-v0025.ps1
+
+Typical model cache:
+C:\Models
+
+
+17. COMMON PROBLEMS
+===================
+
+Problem:
+'llama-server' is not recognized.
+
+Try:
+- Close the Command Prompt opened before installation.
+- Open a new Command Prompt.
+- Run:
+  where llama-server
+  llama-server --version
+
+
+Problem:
+TGAIC says the bridge is unavailable.
+
+Check:
+curl http://127.0.0.1:8787/health
+
+Then confirm the bridge console is still running.
+
+
+Problem:
+Bridge is running but TGAIC cannot see the model.
+
+Check:
+
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/v1/models
+
+Then restart llama.cpp in router mode if necessary.
+
+
+Problem:
+Only one model appears after adding another model.
+
+Restart generic router mode:
+
+Ctrl+C
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Then use Refresh Models in TGAIC.
+
+
+Problem:
+Browser CORS errors.
+
+Use the current TGAIC PowerShell bridge.
+The browser UI should talk to:
+
+http://127.0.0.1:8787/v1
+
+not directly to llama-server.
+
+
+Problem:
+GitHub Pages copy cannot reach the bridge.
+
+Download tgaic-ai-coder.html and run the local copy from disk.
+The hosted HTTPS page may be blocked from calling the local HTTP bridge.
+
+
+18. QUICK DAILY ROUTINE
+=======================
+
+Start llama.cpp:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Start bridge:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+Open:
+
+tgaic-ai-coder.html
+
+In TGAIC:
+
+Connect
+Refresh Models
+Load Selected
+Chat
+
+
+19. QUICK RESTART ROUTINE
+=========================
+
+Stop bridge:
+Ctrl+C
+
+Stop llama-server:
+Ctrl+C
+
+Restart llama-server:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Restart bridge:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+
+Return to TGAIC:
+
+Connect
+Refresh Models
+Load Selected
+
+
+20. MODEL DISCOVERY REFERENCES
+==============================
+
+Hugging Face GGUF catalog:
+
+https://huggingface.co/models?library=gguf
+
+llama.cpp:
+
+https://github.com/ggml-org/llama.cpp
+
+llama-server documentation:
+
+https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+
+llama.cpp model guide:
+
+https://github.com/ggml-org/llama.cpp/blob/master/docs/models.md
+
+Hugging Face Hub API:
+
+https://huggingface.co/docs/hub/api
+
+
+END
+===
+For concepts and terminology, use the References button in TGAIC.
+For the complete setup guide, use the Help button in TGAIC or README.md.
