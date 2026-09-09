@@ -2,21 +2,17 @@
 
 **The Greco AI Coder**
 
-A lightweight, local-first AI coding assistant powered by **llama.cpp** and **GGUF** models, with a browser UI, local model management, and built-in Hugging Face model discovery.
+A lightweight, local-first AI coding assistant with a single-file browser UI, a small localhost bridge, llama.cpp integration, and built-in Hugging Face GGUF model discovery.
 
-> **Run useful coding models on your own hardware.**
+TGAIC keeps the user interface simple and portable while running inference on local hardware through `llama-server`.
+
+> **Your model is local. Your code stays under your control.**
+
+![TGAIC AI Coder screenshot](screenshot.jpeg)
 
 ## Run TGAIC
 
-TGAIC is designed primarily as a local application rather than a hosted inference service.
-
-Open the standalone browser application directly from disk:
-
-```text
-tgaic-ai-coder.html
-```
-
-The local runtime is:
+TGAIC is a local application. The browser UI is a standalone HTML file, but the full runtime also uses the included PowerShell bridge and llama.cpp.
 
 ```text
 TGAIC HTML (file://)
@@ -34,32 +30,30 @@ Local GGUF model cache
 C:\Models
 ```
 
-The browser owns the user interface and conversation history. The PowerShell bridge provides the browser-safe localhost/CORS boundary plus model-management and Hugging Face helper endpoints. `llama-server` performs model loading and inference.
+The browser owns the UI and conversation history. The bridge provides the browser-safe localhost/CORS boundary plus model-management and Hugging Face helper endpoints. `llama-server` performs model loading and inference.
+
+The GitHub Pages site is the public project/documentation entry point. For normal local inference, download or clone the repository and open `tgaic-ai-coder.html` locally after starting llama.cpp and the bridge.
 
 ---
 
-## Features
+## Why TGAIC?
 
-- Local OpenAI-compatible chat through `llama-server`
-- llama.cpp router-mode model discovery
-- Load and unload cached models from the browser
-- Hugging Face GGUF model discovery
-- Result-oriented pagination that continues through Hub results until a logical TGAIC page is filled
-- Hugging Face API-supported global sort choices
-- Quantization and GGUF-size filters
-- Text/multimodal repository filtering
-- `mmproj` and MTP companion-file detection
-- Advisory model-compatibility hints
-- Optional Hugging Face token authentication
-- Safe Markdown rendering for assistant responses
-- Fenced code blocks with language labels and Copy buttons
-- Streaming local responses
-- Local conversation history for the current browser page/session
-- No JavaScript framework or CDN dependency
+Many AI coding tools require cloud accounts, remote inference, subscriptions, or large development stacks.
+
+TGAIC takes a different approach:
+
+- **Local-first inference** — chat runs against models on your own machine.
+- **Single-file browser UI** — the main application UI is one HTML file.
+- **Small local bridge** — PowerShell supplies the localhost/CORS and helper layer.
+- **llama.cpp native runtime** — no browser-embedded model runtime is required.
+- **GGUF-first model workflow** — use quantized models from the Hugging Face ecosystem.
+- **No JavaScript framework/CDN dependency** — the UI remains self-contained.
+- **Manual model control** — discovery, cache, load, unload, and router mode remain visible and understandable.
+- **Progressive capability** — small models work on modest hardware, while the same UI can scale to much larger local machines.
 
 ---
 
-## Windows Setup
+## Getting Started
 
 ### 1. Install llama.cpp
 
@@ -67,14 +61,14 @@ The browser owns the user interface and conversation history. The PowerShell bri
 winget install llama.cpp
 ```
 
-Open a new Command Prompt if Winget updates `PATH`, then verify:
+Verify it is available:
 
 ```bat
 llama-server --version
 where llama-server
 ```
 
-### 2. Establish the TGAIC model cache
+### 2. Establish the local model cache
 
 ```bat
 set LLAMA_CACHE=C:\Models
@@ -88,16 +82,16 @@ For example:
 llama-server -hf Qwen/Qwen2.5-Coder-3B-Instruct-GGUF:Q4_K_M
 ```
 
-Wait for the download and model load to complete, then stop it with `Ctrl+C`.
+Wait for the download and load attempt to complete, then stop it with `Ctrl+C`.
 
-### 4. Start llama.cpp in router mode
+### 4. Start llama.cpp in generic router mode
 
 ```bat
 set LLAMA_CACHE=C:\Models
 llama-server --host 127.0.0.1 --port 8080 -c 8192
 ```
 
-Router mode intentionally has no `-hf` or `-m` model on the startup command.
+Router mode intentionally has no `-hf` or `-m` argument.
 
 ### 5. Start the TGAIC bridge
 
@@ -113,9 +107,59 @@ llama-server: http://127.0.0.1:8080/
 TGAIC API:    http://127.0.0.1:8787/v1
 ```
 
-### 6. Open TGAIC
+### 6. Open the browser UI
 
-Double-click `tgaic-ai-coder.html`, leave the endpoint as `http://127.0.0.1:8787/v1`, click **Connect**, then **Refresh Models** and **Load Selected** as needed.
+Double-click:
+
+```text
+tgaic-ai-coder.html
+```
+
+Leave the endpoint at:
+
+```text
+http://127.0.0.1:8787/v1
+```
+
+Then click **Connect**, **Refresh Models**, and **Load Selected** as needed.
+
+---
+
+## Core Features
+
+### Local Chat
+
+TGAIC sends OpenAI-compatible chat requests through the local bridge to `llama-server`.
+
+### Local Model Manager
+
+The browser can refresh models known to llama.cpp, select cached models, load/unload models, and show the active model.
+
+### Hugging Face Model Browser
+
+TGAIC can search Hugging Face for GGUF repositories through the local bridge.
+
+Current discovery capabilities include:
+
+- Search by model/repository text
+- Results-per-page pagination
+- Hugging Face API-supported global sort choices
+- Quantization filtering
+- GGUF file-size filtering
+- Text versus multimodal repository filtering
+- `mmproj` companion detection
+- MTP-sidecar detection
+- Advisory compatibility hints
+- Optional Hugging Face token authentication
+- Generated `llama-server -hf ...` commands
+
+Changing filters does not automatically contact Hugging Face. Click **Search Models** when ready.
+
+### Markdown Responses
+
+Assistant responses are rendered locally as safe Markdown, including headings, emphasis, lists, inline/fenced code, language labels, Copy buttons, blockquotes, links, horizontal rules, and basic Markdown tables.
+
+Model-produced HTML is escaped rather than executed.
 
 ---
 
@@ -131,7 +175,7 @@ set LLAMA_CACHE=C:\Models
 llama-server -hf user/repository:quant
       │
       ▼
-download + verify model loads
+download + verify load
       │
       ▼
 Ctrl+C
@@ -149,30 +193,39 @@ Load Selected
 Chat
 ```
 
-A GGUF file does **not** necessarily have to fit entirely in GPU VRAM. llama.cpp can offload some work to the GPU and use CPU/system RAM for the remainder. In testing, a roughly 3.4 GB / 6B-class coder/reasoning GGUF ran successfully on a machine with only 2 GB of GPU VRAM.
+A GGUF file does **not** need to fit entirely in GPU VRAM. llama.cpp can offload part of the workload to the GPU and use CPU/system RAM for the remainder.
 
-Model file size is therefore a practical discovery signal, not a hard VRAM limit.
+In testing, a roughly **3.4 GB / 6B-class coder/reasoning GGUF** ran successfully on a machine with only **2 GB of GPU VRAM**.
+
+GGUF file size is therefore a useful discovery signal, not a hard VRAM limit.
 
 ---
 
-## Hugging Face Model Browser
+## Model Compatibility
 
-TGAIC can search Hugging Face through the local bridge.
+A repository containing a `.gguf` file is not automatically guaranteed to load in the installed llama.cpp build.
 
-Searches do not run automatically when filter controls change. Click **Search Models** when ready.
+TGAIC's compatibility column is advisory. It can identify traits such as:
 
-The bridge:
+- Text GGUF
+- Multimodal repository with `mmproj`
+- Optional MTP sidecar
+- Newer model-family warnings
 
-1. Searches the Hugging Face model API.
-2. Prefilters likely GGUF repositories.
-3. Inspects repository trees for exact GGUF files and sizes.
-4. Applies quantization, size, and model-type filters.
-5. Detects companion files such as `mmproj` and MTP sidecars.
-6. Continues through Hub result pages until the requested TGAIC page is filled or the Hub search is exhausted.
+The definitive compatibility check is still whether the exact GGUF conversion successfully loads in the installed llama.cpp build.
 
-Sort options shown in TGAIC are limited to sort keys supported by the Hugging Face model API, so the sort affects the global Hub traversal order rather than only reordering one local page.
+On Windows, llama.cpp may print:
 
-### Hugging Face token
+```text
+failed to create symlink: A required privilege is not held by the client
+switching to degraded mode
+```
+
+If loading continues afterward, that message by itself is not necessarily the fatal error. Read the later llama.cpp output for the actual load result.
+
+---
+
+## Hugging Face Token
 
 An optional token can be entered in the HTML page or supplied to the bridge:
 
@@ -180,47 +233,43 @@ An optional token can be entered in the HTML page or supplied to the bridge:
 set HF_TOKEN=hf_your_token_here
 ```
 
-The HTML token is sent only to the local bridge in the `X-HF-Token` header. TGAIC does not persist it in localStorage, sessionStorage, cookies, or a file.
+The HTML token is sent only to the local bridge in the `X-HF-Token` header. TGAIC does not persist it in localStorage, sessionStorage, cookies, or files.
 
 ---
 
-## Compatibility Notes
+## Local-First Architecture
 
-A repository containing a `.gguf` file is not automatically guaranteed to load in the installed llama.cpp build.
-
-TGAIC's compatibility column is advisory. It can identify repository traits such as text GGUFs, multimodal repositories with `mmproj`, optional MTP sidecars, and newer-model-family warnings.
-
-The definitive compatibility check is still whether llama.cpp successfully loads the exact GGUF conversion.
-
-On Windows, this warning may appear:
+Normal model conversation traffic remains on localhost:
 
 ```text
-failed to create symlink: A required privilege is not held by the client
-switching to degraded mode
+Browser UI
+    │
+    ▼
+127.0.0.1:8787
+    │
+    ▼
+127.0.0.1:8080
+    │
+    ▼
+Local GGUF
 ```
 
-If llama.cpp continues after it, the warning itself is not necessarily fatal. Look for the subsequent model-load error or success message.
+The current intentional external-network exception is **Hugging Face model discovery**. When the user explicitly runs a model search, the bridge contacts the Hugging Face Hub API.
+
+The local GGUF model itself does not inherently browse the web, scrape sites, or search the Internet.
+
+General web search, arbitrary URL fetching, autonomous browsing, image generation, and reference-file/RAG tooling are future capabilities rather than current TGAIC features.
 
 ---
 
-## Markdown Rendering
+## TGAIC and the SFLA Pattern
 
-Assistant responses are rendered locally as safe Markdown, including headings, emphasis, lists, inline/fenced code, blockquotes, links, horizontal rules, basic tables, language labels, and Copy buttons.
+TGAIC borrows the same local-first, minimal-infrastructure philosophy used by the SFLA projects, but there is an important distinction:
 
-Model-produced HTML is escaped rather than executed.
+- `tgaic-ai-coder.html` is a **single-file browser UI**.
+- The complete TGAIC runtime also requires the **PowerShell bridge** and **llama.cpp**.
 
----
-
-## Internet Access
-
-The local GGUF model itself does not browse the Internet.
-
-Current network behavior is deliberately narrow:
-
-- Local chat/model traffic: localhost only
-- Hugging Face Model Browser: contacts Hugging Face only when the user explicitly runs a model search
-
-General web search, arbitrary URL fetching/scraping, autonomous browser tools, image generation, and reference-file/RAG tooling are future capabilities rather than current TGAIC features.
+So TGAIC is intentionally local-first and dependency-light, but it is not a pure browser-only Single-File Local Application in the same sense as TGG Grid.
 
 ---
 
@@ -229,31 +278,61 @@ General web search, arbitrary URL fetching/scraping, autonomous browser tools, i
 ```text
 tgaic-ai-coder/
 │
-├── index.html                         # GitHub Pages launcher
-├── tgaic-ai-coder.html               # Standalone browser application
+├── index.html                         # GitHub Pages project landing page
+├── tgaic-ai-coder.html               # Stable/versionless browser UI
 ├── tgaic-ai-coder-bridge-v0025.ps1   # Local bridge
+├── screenshot.jpeg                    # Repository preview
 ├── README.md
 ├── .gitignore
-├── CHANGELOG.md                       # Optional/recommended
-├── screenshot.jpeg                    # Optional GitHub/SFLA preview
-└── LICENSE                            # Repository license
+├── CHANGELOG.md
+└── LICENSE
 ```
+
+Versioned HTML working copies such as `tgaic-ai-coder-v0021.html` can be retained during development or releases, while `tgaic-ai-coder.html` remains the stable repository entry point.
+
+---
+
+## Browser Support
+
+TGAIC is designed for modern desktop browsers.
+
+The primary tested workflow is Microsoft Edge/Chrome on Windows with the HTML opened directly as a local `file://` page.
 
 ---
 
 ## Privacy
 
-Chat inference runs through local `127.0.0.1` endpoints and the selected local GGUF model.
+Normal chat inference uses the selected local GGUF model through localhost.
 
-The Hugging Face browser is the current intentional external-network feature. A model search sends the search/filter request to Hugging Face through the bridge. A Hugging Face token, when used, is not intended to be logged or persisted by TGAIC.
+Users should still consider browser extensions, operating-system policies, network policies, code pasted into prompts, Hugging Face searches they explicitly run, and tokens or credentials they choose to enter when working with sensitive information.
 
 ---
 
-## Project
+## Project Status
 
-**Repository:** https://github.com/mikejamesgreco/tgaic-ai-coder
+TGAIC is under active development.
 
-**GitHub Pages:** https://mikejamesgreco.github.io/tgaic-ai-coder/
+The project began as a small local coding chat UI and has expanded into a local model manager and Hugging Face GGUF discovery workspace.
+
+---
+
+## Philosophy
+
+```text
+No cloud model required.
+No JavaScript framework.
+No CDN dependency.
+No hidden model runtime.
+
+Just a browser UI, a small local bridge,
+llama.cpp, and your GGUF models.
+```
+
+---
+
+## License
+
+License information will be added to the repository's `LICENSE` file.
 
 ---
 

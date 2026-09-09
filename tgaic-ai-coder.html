@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0020</title>
+<title>TGAIC AI Coder v0021</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -169,6 +169,38 @@ footer{
 @media(max-width:720px){
   body{padding:8px}.connectionGrid{grid-template-columns:1fr}.chat{min-height:420px;max-height:none}.msg{max-width:96%}
 }
+
+.brand-links{
+  display:block;
+  margin-top:3px;
+  font-size:9px;
+  line-height:1.1;
+}
+.brand-links a{
+  color:var(--muted);
+  font-weight:700;
+  text-decoration:none;
+  white-space:nowrap;
+}
+.brand-links a:hover{color:var(--blue);text-decoration:underline}
+.app-footer{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:8px 18px 10px;
+  border-top:1px solid var(--line);
+  background:#f8fafc;
+  color:var(--muted);
+  font-size:10px;
+  letter-spacing:.02em;
+  text-align:center;
+}
+.app-footer strong{font-weight:600;color:#475569}
+.app-footer a{color:#475569;font-weight:600;text-decoration:none}
+.app-footer a:hover{color:var(--blue);text-decoration:underline}
+.footer-sep{margin:0 7px;color:#cbd5e1}
 </style>
 </head>
 <body>
@@ -178,7 +210,7 @@ footer{
       <strong>TGAIC AI Coder</strong>
       <small>The Greco AI Coder — Local Model Conversation</small>
       <div class="brand-links">
-        <a href="https://github.com/mikejamesgreco/tgaic-ai-coder" target="_blank" rel="noopener noreferrer">GitHub / Docs ↗</a>
+        <a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer" title="Open TGAIC documentation and source on GitHub">GitHub / Docs ↗</a>
       </div>
     </div>
     <div class="controls">
@@ -311,7 +343,7 @@ footer{
       <summary>Local setup — complete Windows installation and startup guide</summary>
       <div class="setupBody">
         <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0025.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
-        <p><b>Architecture.</b> TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
+        <p><b>Architecture.</b> TGAIC uses a <b>single-file browser UI</b>, but the complete local runtime also requires the PowerShell bridge and llama.cpp. TGAIC is therefore local-first and dependency-light, but unlike TGG Grid it is not a browser-only Single-File Local Application. TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
 
         
         <p><b>Communication path.</b> Every chat request follows this local round trip. The HTML never talks directly to llama.cpp; the PowerShell bridge is the browser-facing boundary and forwards the OpenAI-compatible request to llama-server. The streamed response comes back through the same path.</p>
@@ -499,7 +531,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
         <div class="setupSection">
           <h3>24. Repository and project documentation</h3>
-          <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding or <b>GitHub / README ↗</b> in the footer to open the public project repository. The repository is intended to contain the standalone HTML application, PowerShell bridge, README, GitHub Pages launcher, release history, and related project resources.</p>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0021.html</code> are useful during development, while the versionless file is the stable repository/Pages entry point.</p>
+          <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
 </details>
   </section>
@@ -524,16 +557,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
     <div class="note">Enter sends. Shift+Enter inserts a new line. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
   </section>
 
-  <footer class="app-footer">
-    <span>© <span id="year"></span> mikejamesgreco.me LLC. All rights reserved. <span id="version"></span></span>
-    <span><a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer">GitHub / README ↗</a></span>
-    <span>Single-file conversation UI · PowerShell localhost bridge · native GPU runtime</span>
+  <footer class="app-footer" title="TGAIC AI Coder — The Greco AI Coder">
+    <span>© <span id="year"></span> <strong>mikejamesgreco.me LLC</strong>. All rights reserved. <span id="version"></span><span class="footer-sep">|</span><a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer" title="Open the TGAIC repository and README on GitHub">GitHub / README ↗</a></span>
   </footer>
 </div>
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0020';
+const APP_VERSION='v0021';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
