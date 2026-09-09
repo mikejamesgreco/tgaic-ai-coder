@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0021</title>
+<title>TGAIC AI Coder v0022</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -231,7 +231,7 @@ footer{
       </div>
       <div class="connectActions"><button class="primary" id="connectBtn" type="button">Connect</button><button id="disconnectBtn" type="button" disabled>Disconnect</button><button id="stopBridgeBtn" type="button">Stop Bridge</button></div>
     </div>
-    <div class="note">Recommended setup: <b>double-click this HTML file directly</b>. TGAIC runs as a local <code>file://</code> page and talks to the PowerShell bridge on <b>127.0.0.1:8787</b>. The bridge supplies CORS headers and forwards OpenAI-compatible chat/model requests to llama.cpp on <b>127.0.0.1:8080/v1</b>. Chat inference stays local. The optional Hugging Face Model Browser is the current exception: when you explicitly click <b>Search Models</b>, the bridge contacts the Hugging Face Hub API to discover model repositories.</div>
+    <div class="note"><b>Important:</b> download this HTML file and run the local copy. The supported setup is to <b>double-click <code>tgaic-ai-coder.html</code> directly from disk</b> so TGAIC runs as a local <code>file://</code> page. The GitHub Pages copy is useful for viewing the project, but an HTTPS-hosted page may be blocked by the browser from calling the local plain-HTTP bridge on <b>127.0.0.1:8787</b>. The bridge supplies CORS headers and forwards OpenAI-compatible chat/model requests to llama.cpp on <b>127.0.0.1:8080/v1</b>. Chat inference stays local. The optional Hugging Face Model Browser is the current exception: when you explicitly click <b>Search Models</b>, the bridge contacts the Hugging Face Hub API to discover model repositories.</div>
     <details class="modelManager" open>
       <summary>Local Model Manager — llama.cpp router mode</summary>
       <div class="modelManagerBody">
@@ -343,6 +343,7 @@ footer{
       <summary>Local setup — complete Windows installation and startup guide</summary>
       <div class="setupBody">
         <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0025.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
+        <p class="note"><b>Run the downloaded HTML locally:</b> the GitHub Pages copy is not the normal TGAIC runtime. Because GitHub Pages is HTTPS and the TGAIC bridge is normally plain HTTP on <code>127.0.0.1:8787</code>, modern browser mixed-content/private-network rules may block the hosted page from reaching the bridge. Download <code>tgaic-ai-coder.html</code>, then double-click the local file.</p>
         <p><b>Architecture.</b> TGAIC uses a <b>single-file browser UI</b>, but the complete local runtime also requires the PowerShell bridge and llama.cpp. TGAIC is therefore local-first and dependency-light, but unlike TGG Grid it is not a browser-only Single-File Local Application. TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
 
         
@@ -415,7 +416,7 @@ where llama-server</pre>
         <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1</pre>
         <p>The bridge should report <code>Listening : http://127.0.0.1:8787/</code> and <code>Upstream : http://127.0.0.1:8080/v1</code>. Leave this second console window running.</p>
 
-        <p><b>5. Open TGAIC.</b> Double-click this HTML file. It is intentionally opened directly from disk as a <code>file://</code> application. The endpoint should remain:</p>
+        <p><b>5. Download and open TGAIC locally.</b> Download or clone the repository so you have a local copy of <code>tgaic-ai-coder.html</code>, then double-click that file. TGAIC is intentionally run directly from disk as a <code>file://</code> application. Do not rely on the GitHub Pages-hosted copy for normal bridge access. The endpoint should remain:</p>
         <pre>http://127.0.0.1:8787/v1</pre>
         <p>Leave the Model field blank and click <b>Connect</b>. TGAIC first checks the bridge and then requests <code>/v1/models</code>; the loaded llama.cpp model should be discovered automatically. A green <b>Connected · 1 model</b> badge means the entire chain is working.</p>
 
@@ -525,13 +526,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
         </div>
 
         <div class="setupSection">
-          <h3>23. Internet access and tool boundaries</h3>
+          <h3>23. Hosted page and browser security</h3>
+          <p>The TGAIC repository may be viewed through GitHub Pages, but the supported runtime is the downloaded standalone HTML file. GitHub Pages uses <code>https://</code> while the local TGAIC bridge normally uses <code>http://127.0.0.1:8787</code>. Modern browsers may restrict or block that HTTPS-to-local-HTTP request because of mixed-content, private-network-access, or enterprise security policies.</p>
+          <p>For reliable operation, download <code>tgaic-ai-coder.html</code> and open it directly from disk. TGAIC does not attempt to bypass browser security policies.</p>
+        </div>
+
+        <div class="setupSection">
+          <h3>24. Internet access and tool boundaries</h3>
           <p>The local GGUF model itself does <b>not</b> browse the web, scrape sites, or search the Internet. Current chat inference is local. The Hugging Face Model Browser is a specific bridge feature that performs Hub API requests only when you initiate a model search. General web search, arbitrary URL fetching, autonomous browsing, image generation, and reference-file/RAG tooling are not currently part of TGAIC.</p>
         </div>
 
         <div class="setupSection">
-          <h3>24. Repository and project documentation</h3>
-          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0021.html</code> are useful during development, while the versionless file is the stable repository/Pages entry point.</p>
+          <h3>25. Repository and project documentation</h3>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0022.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
           <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
 </details>
@@ -554,7 +561,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
         <button class="primary" id="sendBtn" type="button" disabled>Send</button>
       </div>
     </div>
-    <div class="note">Enter sends. Shift+Enter inserts a new line. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
+    <div class="note">Enter sends. Shift+Enter inserts a new line. Run the <b>downloaded local HTML file</b> for normal bridge access. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
   </section>
 
   <footer class="app-footer" title="TGAIC AI Coder — The Greco AI Coder">
@@ -564,7 +571,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0021';
+const APP_VERSION='v0022';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),

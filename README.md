@@ -14,6 +14,10 @@ TGAIC keeps the user interface simple and portable while running inference on lo
 
 TGAIC is a local application. The browser UI is a standalone HTML file, but the full runtime also uses the included PowerShell bridge and llama.cpp.
 
+> **Download `tgaic-ai-coder.html` and run it locally.** The GitHub Pages copy is useful for viewing the project, but the supported TGAIC runtime is the downloaded/local HTML file opened directly from disk.
+
+Like TGRCL, TGAIC talks from the browser to a local plain-HTTP bridge. A page opened from `https://mikejamesgreco.github.io/` may be prevented by the browser from calling `http://127.0.0.1:8787` because of mixed-content, private-network, or enterprise browser security rules. Opening the downloaded HTML as a local `file://` page avoids that hosted HTTPS-to-local HTTP boundary in the normal TGAIC workflow.
+
 ```text
 TGAIC HTML (file://)
         │
@@ -32,7 +36,7 @@ C:\Models
 
 The browser owns the UI and conversation history. The bridge provides the browser-safe localhost/CORS boundary plus model-management and Hugging Face helper endpoints. `llama-server` performs model loading and inference.
 
-The GitHub Pages site is the public project/documentation entry point. For normal local inference, download or clone the repository and open `tgaic-ai-coder.html` locally after starting llama.cpp and the bridge.
+The GitHub Pages site is the public project/documentation entry point. For normal local inference, **download or clone the repository**, start llama.cpp and the bridge, then open the downloaded `tgaic-ai-coder.html` directly from disk.
 
 ---
 
@@ -107,13 +111,15 @@ llama-server: http://127.0.0.1:8080/
 TGAIC API:    http://127.0.0.1:8787/v1
 ```
 
-### 6. Open the browser UI
+### 6. Download and open the browser UI locally
 
-Double-click:
+Download or clone the repository so you have a local copy of:
 
 ```text
 tgaic-ai-coder.html
 ```
+
+Then double-click that local file. The supported runtime is the local `file://` page, not the GitHub Pages-hosted copy.
 
 Leave the endpoint at:
 
@@ -237,6 +243,26 @@ The HTML token is sent only to the local bridge in the `X-HF-Token` header. TGAI
 
 ---
 
+## Hosted Page and Browser Security
+
+The repository can be published with GitHub Pages at:
+
+**https://mikejamesgreco.github.io/tgaic-ai-coder/**
+
+However, the hosted page uses HTTPS while the normal TGAIC bridge listens on plain HTTP at:
+
+```text
+http://127.0.0.1:8787
+```
+
+Modern browsers may restrict or block an HTTPS page from calling a local HTTP service because of mixed-content, private-network-access, or enterprise security policies.
+
+For that reason, the **downloaded standalone `tgaic-ai-coder.html` file is the supported and most reliable way to run TGAIC**.
+
+TGAIC does not attempt to bypass browser security policies.
+
+---
+
 ## Local-First Architecture
 
 Normal model conversation traffic remains on localhost:
@@ -278,7 +304,7 @@ So TGAIC is intentionally local-first and dependency-light, but it is not a pure
 ```text
 tgaic-ai-coder/
 │
-├── index.html                         # GitHub Pages project landing page
+├── index.html                         # GitHub Pages launcher → tgaic-ai-coder.html
 ├── tgaic-ai-coder.html               # Stable/versionless browser UI
 ├── tgaic-ai-coder-bridge-v0025.ps1   # Local bridge
 ├── screenshot.jpeg                    # Repository preview
@@ -296,7 +322,7 @@ Versioned HTML working copies such as `tgaic-ai-coder-v0021.html` can be retaine
 
 TGAIC is designed for modern desktop browsers.
 
-The primary tested workflow is Microsoft Edge/Chrome on Windows with the HTML opened directly as a local `file://` page.
+The primary tested workflow is Microsoft Edge/Chrome on Windows with the **downloaded HTML opened directly as a local `file://` page**. If the GitHub Pages copy cannot reach the local bridge, use the downloaded standalone HTML file.
 
 ---
 
