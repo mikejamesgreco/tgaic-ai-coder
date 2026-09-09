@@ -1,0 +1,55 @@
+# ============================================================
+# TGG Grid - .gitignore
+# ============================================================
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.log
+
+# TGG development / scratch files
+_tgg_*_check.js
+*_check.js
+scratch/
+temp/
+tmp/
+
+# Development/test dependencies only.
+# TGG Grid itself has zero third-party runtime dependencies.
+node_modules/
+
+# Automated test output
+test-results/
+playwright-report/
+coverage/
+
+# Local environment files / secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+secrets/
+
+# Generated archives
+*.zip
+*.tar
+*.tar.gz
+
+# Keep public sample CSV/JSON fixtures and repo artifacts in source control.
+
+# semgrep scan results
+scan-results

@@ -1,0 +1,1273 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TGAIC AI Coder v0020</title>
+<meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#f4f6f8;--panel:#fff;--text:#1f2937;--muted:#64748b;--line:#d9e1ea;
+  --blue:#2563eb;--blue2:#1d4ed8;--soft:#f8fafc;--bad:#b91c1c;--good:#15803d;
+}
+html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+body{padding:18px}
+.app{max-width:1200px;margin:0 auto;min-height:calc(100vh - 36px);display:flex;flex-direction:column;gap:14px}
+.topbar{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:12px 14px;background:linear-gradient(#fff,#fbfcfe);border:1px solid var(--line);
+  border-radius:10px;box-shadow:0 2px 8px rgba(15,23,42,.05)
+}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand strong{font-size:22px;line-height:1.02;letter-spacing:-.03em}
+.brand small{
+  font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  opacity:.42;white-space:nowrap;animation:tgaicSoftBlink 2.2s ease-in-out infinite
+}
+@keyframes tgaicSoftBlink{0%,100%{opacity:.28}50%{opacity:.95}}
+.brand-links{display:flex;gap:10px;align-items:center;margin-top:4px;font-size:10px}
+.brand-links a,.app-footer a{color:var(--blue);font-weight:700;text-decoration:none}
+.brand-links a:hover,.app-footer a:hover{text-decoration:underline}
+
+@media (prefers-reduced-motion:reduce){.brand small{animation:none;opacity:.72}}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,input,textarea{font-family:Arial,Helvetica,sans-serif}
+button{
+  border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:7px;
+  padding:8px 10px;font-weight:800;font-size:12px;cursor:pointer
+}
+button:hover{border-color:#94a3b8}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+button.primary:hover{background:var(--blue2)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.badge{
+  display:inline-flex;align-items:center;padding:5px 8px;border:1px solid var(--line);
+  background:var(--soft);border-radius:999px;font-size:10px;font-weight:800;color:#475569
+}
+.badge.good{color:var(--good);border-color:#bbf7d0;background:#f0fdf4}
+.badge.bad{color:var(--bad);border-color:#fecaca;background:#fef2f2}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 15px rgba(15,23,42,.04)}
+.connection{padding:12px 14px}
+.connectActions{display:flex;gap:6px;align-items:center;align-self:end;flex-wrap:wrap}
+.connectionGrid{display:grid;grid-template-columns:1.7fr 1fr auto;gap:8px;align-items:end}
+label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px}
+input[type=text],select{
+  width:100%;border:1px solid #cbd5e1;background:#fff;color:#1f2937;border-radius:7px;padding:9px;font-size:12px
+}
+.note{font-size:10px;color:var(--muted);line-height:1.45;margin-top:8px}
+.chat{
+  flex:1;min-height:520px;max-height:calc(100vh - 330px);overflow:auto;background:#f8fafc;
+  border:1px solid #dbe3ec;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px
+}
+.msg{max-width:90%;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:#dbeafe;border:1px solid #bfdbfe}
+.msg.assistant{align-self:flex-start;background:#0f172a;color:#e2e8f0;border:1px solid #1e293b;font-family:Consolas,Monaco,monospace}
+.msg.system{align-self:center;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-size:11px}
+.msg .who{display:block;font:800 9px Arial,Helvetica,sans-serif;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;opacity:.7}
+.msg.assistant{font-family:Arial,Helvetica,sans-serif}
+.msg .body{display:block;min-width:0}
+.msg.assistant .body{line-height:1.55;overflow-wrap:anywhere}
+.msg.assistant .body>:first-child{margin-top:0}
+.msg.assistant .body>:last-child{margin-bottom:0}
+.msg.assistant .body p{margin:.55em 0}
+.msg.assistant .body h1,.msg.assistant .body h2,.msg.assistant .body h3,
+.msg.assistant .body h4,.msg.assistant .body h5,.msg.assistant .body h6{
+  margin:1em 0 .45em;font-family:Arial,Helvetica,sans-serif;line-height:1.25;color:#f8fafc
+}
+.msg.assistant .body h1{font-size:1.45em}
+.msg.assistant .body h2{font-size:1.3em}
+.msg.assistant .body h3{font-size:1.16em}
+.msg.assistant .body h4,.msg.assistant .body h5,.msg.assistant .body h6{font-size:1em}
+.msg.assistant .body ul,.msg.assistant .body ol{margin:.55em 0 .65em 1.5em;padding:0}
+.msg.assistant .body li{margin:.25em 0}
+.msg.assistant .body blockquote{
+  margin:.7em 0;padding:.15em .8em;border-left:3px solid #64748b;color:#cbd5e1;background:#111827
+}
+.msg.assistant .body a{color:#93c5fd;text-decoration:underline}
+.msg.assistant .body code{
+  font-family:Consolas,Monaco,"Courier New",monospace;background:#1e293b;color:#f8fafc;
+  border:1px solid #334155;border-radius:4px;padding:.08em .3em;font-size:.94em
+}
+.msg.assistant .body .md-code{
+  margin:.75em 0;border:1px solid #334155;border-radius:7px;overflow:hidden;background:#020617
+}
+.msg.assistant .body .md-code-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:5px 7px;background:#111827;border-bottom:1px solid #334155
+}
+.msg.assistant .body .md-code-lang{
+  color:#94a3b8;font:700 10px Arial,Helvetica,sans-serif;text-transform:lowercase
+}
+.msg.assistant .body .md-copy{
+  border:1px solid #475569;background:#1e293b;color:#e2e8f0;border-radius:5px;
+  padding:3px 7px;font:700 10px Arial,Helvetica,sans-serif;cursor:pointer
+}
+.msg.assistant .body .md-copy:hover{background:#334155}
+.msg.assistant .body pre{
+  margin:0;padding:11px 12px;overflow:auto;white-space:pre;tab-size:4;line-height:1.45
+}
+.msg.assistant .body pre code{
+  display:block;padding:0;border:0;border-radius:0;background:transparent;color:#e2e8f0;font-size:12px
+}
+.msg.assistant .body table{width:100%;border-collapse:collapse;margin:.75em 0;font-size:.95em}
+.msg.assistant .body th,.msg.assistant .body td{
+  border:1px solid #334155;padding:6px 8px;text-align:left;vertical-align:top
+}
+.msg.assistant .body th{background:#1e293b;color:#f8fafc}
+.msg.assistant .body hr{border:0;border-top:1px solid #334155;margin:1em 0}
+
+.composer{padding:12px}
+textarea{
+  width:100%;min-height:120px;resize:vertical;border:1px solid #cbd5e1;border-radius:8px;padding:11px;
+  color:#1f2937;background:#fff;font-size:13px;line-height:1.5
+}
+.actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px}
+.leftActions,.rightActions{display:flex;gap:8px;flex-wrap:wrap}
+footer{
+  margin-top:auto;padding:10px 2px 2px;color:var(--muted);font-size:10px;
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap
+}
+ 
+.modelManager{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}
+.modelManager summary{cursor:pointer;padding:9px 10px;font-size:11px;font-weight:800;color:#334155}
+.modelManagerBody{padding:0 10px 10px}
+.modelToolbar{display:flex;gap:6px;align-items:end;flex-wrap:wrap;margin:8px 0}
+.modelToolbar .grow{flex:1 1 360px}
+.modelTableWrap{overflow:auto;max-height:250px;border:1px solid var(--line);border-radius:6px;background:white}
+.modelTable{width:100%;border-collapse:collapse;font-size:11px}
+.modelTable th,.modelTable td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.modelTable th{position:sticky;top:0;background:#f8fafc;z-index:1}
+.modelTable tr.selected{outline:2px solid #94a3b8;outline-offset:-2px}
+.modelTable tr{cursor:pointer}
+.modelTable .muted{color:#64748b}
+.modelStatus{font-size:11px;color:#475569;margin-top:6px}
+
+
+.hfBrowser{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}
+.hfBrowser summary{cursor:pointer;padding:9px 10px;font-size:11px;font-weight:800;color:#334155}
+.hfBrowserBody{padding:0 10px 10px}
+.hfToolbar{display:grid;grid-template-columns:minmax(240px,2fr) minmax(150px,1fr) minmax(130px,1fr) auto;gap:7px;align-items:end;margin:8px 0}
+.hfTableWrap{overflow:auto;max-height:330px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.hfTable{width:100%;border-collapse:collapse;font-size:11px}
+.hfTable th,.hfTable td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.hfTable th{position:sticky;top:0;background:#f8fafc;z-index:1;white-space:nowrap}
+.hfTable .muted{color:#64748b}
+.hfTable a{color:#1d4ed8;text-decoration:none;font-weight:700}
+.hfTable a:hover{text-decoration:underline}
+.hfActions{display:flex;gap:5px;flex-wrap:wrap}
+.hfStatus{font-size:11px;color:#475569;margin-top:6px}
+.hfCommand{font:10px/1.35 Consolas,Monaco,monospace;white-space:nowrap}
+@media(max-width:820px){.hfToolbar{grid-template-columns:1fr 1fr}.hfToolbar .hfSearchField{grid-column:1/-1}}
+
+.setupBox{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}
+.setupBox summary{cursor:pointer;padding:9px 10px;font-size:11px;font-weight:800;color:#334155}
+.setupBody{padding:0 10px 10px;font-size:11px;color:#475569;line-height:1.5}
+.setupBody p{margin:7px 0}
+.setupBody pre{margin:7px 0;padding:9px;background:#0f172a;color:#dbeafe;border-radius:7px;overflow:auto;font:10px/1.45 Consolas,Monaco,monospace}
+.setupBody code{font-family:Consolas,Monaco,monospace}
+@media(max-width:720px){
+  body{padding:8px}.connectionGrid{grid-template-columns:1fr}.chat{min-height:420px;max-height:none}.msg{max-width:96%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <strong>TGAIC AI Coder</strong>
+      <small>The Greco AI Coder — Local Model Conversation</small>
+      <div class="brand-links">
+        <a href="https://github.com/mikejamesgreco/tgaic-ai-coder" target="_blank" rel="noopener noreferrer">GitHub / Docs ↗</a>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="badge" id="statusBadge">Not connected</span>
+      <button id="newChatBtn" type="button">New Chat</button>
+    </div>
+  </header>
+
+  <section class="card connection">
+    <div class="connectionGrid">
+      <div>
+        <label for="endpoint">Local OpenAI-compatible endpoint</label>
+        <input id="endpoint" type="text" value="http://127.0.0.1:8787/v1" spellcheck="false">
+      </div>
+      <div>
+        <label for="model">Model</label>
+        <input id="model" type="text" value="" placeholder="Auto-detected from llama.cpp" spellcheck="false">
+      </div>
+      <div class="connectActions"><button class="primary" id="connectBtn" type="button">Connect</button><button id="disconnectBtn" type="button" disabled>Disconnect</button><button id="stopBridgeBtn" type="button">Stop Bridge</button></div>
+    </div>
+    <div class="note">Recommended setup: <b>double-click this HTML file directly</b>. TGAIC runs as a local <code>file://</code> page and talks to the PowerShell bridge on <b>127.0.0.1:8787</b>. The bridge supplies CORS headers and forwards OpenAI-compatible chat/model requests to llama.cpp on <b>127.0.0.1:8080/v1</b>. Chat inference stays local. The optional Hugging Face Model Browser is the current exception: when you explicitly click <b>Search Models</b>, the bridge contacts the Hugging Face Hub API to discover model repositories.</div>
+    <details class="modelManager" open>
+      <summary>Local Model Manager — llama.cpp router mode</summary>
+      <div class="modelManagerBody">
+        <div class="note">When llama-server is started in <b>router mode</b> (no <code>-m</code> or <code>-hf</code> model on the startup command), TGAIC can ask llama.cpp for the models available in its local cache/model directory, show their size/status, and load or unload one without restarting TGAIC.</div>
+        <div class="modelToolbar">
+          <div class="grow">
+            <label for="availableModelSelect">Available local model</label>
+            <select id="availableModelSelect"><option value="">Click Refresh Models</option></select>
+          </div>
+          <button id="refreshModelsBtn" type="button">Refresh Models</button>
+          <button id="loadModelBtn" type="button" disabled>Load Selected</button>
+          <button id="unloadModelBtn" type="button" disabled>Unload Selected</button>
+        </div>
+        <div class="modelTableWrap">
+          <table class="modelTable">
+            <thead><tr><th>Model</th><th>Size</th><th>Status</th><th>Location</th></tr></thead>
+            <tbody id="modelTableBody"><tr><td colspan="4" class="muted">No model list loaded yet.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="modelStatus" id="modelManagerStatus">This lists models llama.cpp already knows locally. It is not the entire Hugging Face catalog.</div>
+      </div>
+    </details>
+
+
+    <details class="hfBrowser" open>
+      <summary>Hugging Face Model Browser — discover GGUF models online</summary>
+      <div class="hfBrowserBody">
+        <div class="note">Searches Hugging Face model candidates through the TGAIC bridge and displays repositories containing <b>GGUF</b> files. Results are paginated; <b>Results per page</b> defaults to 10. The bridge keeps following Hugging Face search pages internally until it has collected that many matching GGUF repositories. When a specific quantization is selected, each repository contributes at most one displayed row, or Hugging Face reports that there are no more results. Changing search text, quantization, size, model type, Hugging Face sort, token, or results-per-page does not contact Hugging Face automatically; click <b>Search Models</b> when you are ready to run a new search. The sort choices shown here are supported by the Hugging Face models API and therefore control the global Hub traversal order; TGAIC does not locally re-sort individual pages. Use <b>Previous</b> and <b>Next</b> to move through the resulting TGAIC pages. You may optionally enter an <b>HF Token</b> for authenticated API access; the token is sent only to the local bridge for the current request and is not stored by TGAIC. The bridge prefilters search metadata for GGUF candidates before making repo-tree calls, shows available quantizations and actual GGUF file sizes when reported, and generates a copy-ready <code>llama-server -hf ...</code> command. This panel does <b>not</b> download or start models.</div>
+        <div class="hfToolbar">
+          <div class="hfSearchField">
+            <label for="hfSearch">Search Hugging Face</label>
+            <input id="hfSearch" type="text" value="coder" placeholder="coder, Qwen, Llama, Gemma..." spellcheck="false">
+          </div>
+          <div>
+            <label for="hfToken">HF Token (optional)</label>
+            <input id="hfToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_...">
+            <div class="tiny">Sent only to the local TGAIC bridge for Hugging Face requests. Not saved by TGAIC.</div>
+          </div>
+          <div>
+            <label for="hfLimit">Results per page</label>
+            <input id="hfLimit" type="number" min="1" max="100" step="1" value="10">
+          </div>
+          <div>
+            <label for="hfQuantFilter">Quantization</label>
+            <select id="hfQuantFilter">
+              <option value="Q4_K_M" selected>Q4_K_M preferred</option>
+              <option value="">All quantizations</option>
+              <option value="Q5_K_M">Q5_K_M</option>
+              <option value="Q6_K">Q6_K</option>
+              <option value="Q8_0">Q8_0</option>
+              <option value="Q3_K_M">Q3_K_M</option>
+              <option value="Q2_K">Q2_K</option>
+            </select>
+          </div>
+          <div>
+            <label for="hfSizeFilter">GGUF file size</label>
+            <select id="hfSizeFilter">
+              <option value="" selected>All sizes</option>
+              <option value="0-1">Under 1 GB</option>
+              <option value="1-2">1–2 GB</option>
+              <option value="2-4">2–4 GB</option>
+              <option value="4-8">4–8 GB</option>
+              <option value="8-16">8–16 GB</option>
+              <option value="16-32">16–32 GB</option>
+              <option value="32+">32 GB+</option>
+            </select>
+          </div>
+          <div>
+            <label for="hfTypeFilter">Model type</label>
+            <select id="hfTypeFilter">
+              <option value="text" selected>Text GGUF only</option>
+              <option value="">All GGUF types</option>
+              <option value="multimodal">Multimodal / mmproj</option>
+            </select>
+            <div class="tiny">Text-only is recommended for the current TGAIC chat UI.</div>
+          </div>
+          <div>
+            <label for="hfSort">Hugging Face sort</label>
+            <select id="hfSort">
+              <option value="downloads" selected>Downloads</option>
+              <option value="likes">Likes</option>
+              <option value="last_modified">Recently modified</option>
+              <option value="created_at">Recently created</option>
+              <option value="trending_score">Trending</option>
+            </select>
+          </div>
+          <button class="primary" id="hfSearchBtn" type="button">Search Models</button>
+        </div>
+        <div class="modelToolbar">
+          <div class="grow note" style="margin:0">The generated command assumes the standard TGAIC cache setup: <code>set LLAMA_CACHE=C:\Models</code>. Stop router mode before manually running the copied <code>-hf</code> command. Compatibility is a pre-download hint based on repository contents and known architecture risk; it cannot guarantee that a particular GGUF conversion will load in your installed llama.cpp build.</div>
+          <button id="hfCopyCacheBtn" type="button">Copy Cache Command</button>
+        </div>
+        <div class="hfTableWrap">
+          <table class="hfTable">
+            <thead><tr><th>Model / Repository</th><th>Quant</th><th>GGUF Size</th><th>Compatibility</th><th>Downloads</th><th>Likes</th><th>Modified</th><th>Actions</th></tr></thead>
+            <tbody id="hfTableBody"><tr><td colspan="8" class="muted">Search Hugging Face to discover GGUF models.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="modelToolbar" style="margin-top:8px">
+          <button id="hfPrevBtn" type="button" disabled>Previous</button>
+          <div class="grow note" id="hfPageLabel" style="margin:0;text-align:center">Page 1</div>
+          <button id="hfNextBtn" type="button" disabled>Next</button>
+        </div>
+        <div class="hfStatus" id="hfStatus">Online discovery only — models are not downloaded automatically.</div>
+      </div>
+    </details>
+
+    <details class="setupBox">
+      <summary>Local setup — complete Windows installation and startup guide</summary>
+      <div class="setupBody">
+        <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0025.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
+        <p><b>Architecture.</b> TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
+
+        
+        <p><b>Communication path.</b> Every chat request follows this local round trip. The HTML never talks directly to llama.cpp; the PowerShell bridge is the browser-facing boundary and forwards the OpenAI-compatible request to llama-server. The streamed response comes back through the same path.</p>
+        <pre class="commDiagram">┌──────────────────────────────┐
+│ TGAIC HTML                   │
+│ file://.../tgaic-ai-coder... │
+│ Browser UI + chat history    │
+└──────────────┬───────────────┘
+               │
+               │ HTTP request
+               │ http://127.0.0.1:8787/v1/...
+               ▼
+┌──────────────────────────────┐
+│ TGAIC PowerShell Bridge      │
+│ 127.0.0.1:8787              │
+│ CORS + localhost API proxy   │
+└──────────────┬───────────────┘
+               │
+               │ forwards request
+               │ http://127.0.0.1:8080/v1/...
+               ▼
+┌──────────────────────────────┐
+│ llama-server / llama.cpp     │
+│ 127.0.0.1:8080              │
+│ Router + model inference     │
+└──────────────┬───────────────┘
+               │
+               │ loads selected GGUF
+               ▼
+┌──────────────────────────────┐
+│ Local Model Cache            │
+│ C:\Models                    │
+│ Qwen / other GGUF models     │
+└──────────────────────────────┘
+
+RESPONSE PATH
+
+llama-server
+     │
+     │ streamed OpenAI-compatible response
+     ▼
+PowerShell Bridge
+     │
+     │ streamed HTTP/SSE response
+     ▼
+TGAIC HTML
+     │
+     └── renders assistant response in the conversation
+
+REQUEST:  HTML → Bridge :8787 → llama-server :8080 → Model
+RESPONSE: Model → llama-server :8080 → Bridge :8787 → HTML</pre>
+        <p>The bridge does not generate answers and does not own the conversation. TGAIC keeps the chat history in the browser and sends the required messages with each request. llama-server owns model loading/inference. The bridge primarily provides the safe local HTTP/CORS boundary and streams traffic in both directions.</p>
+
+<p><b>1. Install llama.cpp.</b> Open Command Prompt and run:</p>
+        <pre>winget install llama.cpp</pre>
+        <p>Winget may report that PATH was modified. If so, close that Command Prompt and open a new one. Verify the installation:</p>
+        <pre>llama-server --version
+where llama-server</pre>
+
+        <p><b>2. Start a model with llama-server.</b> The easiest method is <code>-hf</code>, which lets llama.cpp obtain a compatible GGUF model from Hugging Face. Our known-working laptop example is:</p>
+        <pre>llama-server -hf Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M --host 127.0.0.1 --port 8080 -c 4096</pre>
+        <p>The first launch downloads/caches the model. Wait until the console reports <code>model loaded</code> and <code>listening on http://127.0.0.1:8080</code>. Leave this window running.</p>
+
+        <p><b>3. Alternative: run a GGUF file you already downloaded.</b></p>
+        <pre>llama-server -m "C:\Models\your-model.gguf" --host 127.0.0.1 --port 8080 -c 4096</pre>
+        <p><code>-hf</code> is convenient for downloading/running a Hugging Face GGUF repository; <code>-m</code> is useful when you want explicit control over a local GGUF file.</p>
+
+        <p><b>4. Start the TGAIC PowerShell bridge.</b> Put the bridge PS1 somewhere convenient, open a second Command Prompt in that directory, and run:</p>
+        <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1</pre>
+        <p>The bridge should report <code>Listening : http://127.0.0.1:8787/</code> and <code>Upstream : http://127.0.0.1:8080/v1</code>. Leave this second console window running.</p>
+
+        <p><b>5. Open TGAIC.</b> Double-click this HTML file. It is intentionally opened directly from disk as a <code>file://</code> application. The endpoint should remain:</p>
+        <pre>http://127.0.0.1:8787/v1</pre>
+        <p>Leave the Model field blank and click <b>Connect</b>. TGAIC first checks the bridge and then requests <code>/v1/models</code>; the loaded llama.cpp model should be discovered automatically. A green <b>Connected · 1 model</b> badge means the entire chain is working.</p>
+
+        <p><b>6. Chat.</b> Type a prompt and press <b>Enter</b> to send. Use <b>Shift+Enter</b> for a new line. <b>Stop</b> aborts the current generation. <b>Disconnect</b> disconnects the HTML UI but leaves the bridge and llama.cpp running. <b>Stop Bridge</b> asks the PowerShell bridge to exit; llama.cpp continues running separately.</p>
+
+        <p><b>7. Shut everything down.</b> Use <b>Stop Bridge</b> or press <code>Ctrl+C</code> in the bridge console. Then press <code>Ctrl+C</code> in the llama-server console to unload the model and stop the inference server. Closing the HTML page does not automatically stop either process.</p>
+
+        <p><b>8. Start again later.</b> You do not normally need to reinstall llama.cpp or redownload an already cached model. Start <code>llama-server</code> with the desired model, start the bridge, double-click TGAIC, and click <b>Connect</b>.</p>
+
+        <p><b>Useful checks.</b></p>
+        <pre>llama-server --version
+
+curl http://127.0.0.1:8080/health
+
+curl http://127.0.0.1:8080/v1/models
+
+curl http://127.0.0.1:8787/health
+
+curl http://127.0.0.1:8787/v1/models</pre>
+
+        <p><b>Troubleshooting.</b> If TGAIC says the bridge is unavailable, confirm the PowerShell bridge is running on port 8787. If the bridge is ready but the model request fails, confirm llama-server is still running on port 8080. If <code>llama-server</code> is not recognized immediately after installation, open a new Command Prompt so the updated PATH is loaded. If the browser reports CORS errors, use the current TGAIC bridge; it owns the browser-facing CORS headers and deliberately does not pass conflicting llama.cpp CORS headers through.</p>
+
+        <p><b>Model notes.</b> llama.cpp runs models in <b>GGUF</b> format. Hugging Face hosts many llama.cpp-compatible GGUF repositories. With <code>-hf user/repository:quant</code>, the quantization suffix selects a variant such as <code>Q4_K_M</code>. Smaller parameter counts and stronger quantization generally reduce memory requirements; larger models generally require more RAM/VRAM and take longer to generate. Hardware determines which model size is practical.</p>
+
+        <p><b>9. Standard TGAIC model-cache setup.</b> We use llama.cpp's cache as the normal TGAIC model library and explicitly place it under <code>C:\Models</code>. In each new Command Prompt that will run llama.cpp, set:</p>
+        <pre>set LLAMA_CACHE=C:\Models</pre>
+        <p>This environment variable applies to that Command Prompt and processes launched from it. Models downloaded with <code>-hf</code> while it is set are cached under <code>C:\Models</code> and do not need to be downloaded again.</p>
+
+        <p><b>10. Download/add a model to the TGAIC cache.</b> Stop router mode first with <code>Ctrl+C</code>, keep <code>LLAMA_CACHE=C:\Models</code> set, and launch the desired Hugging Face GGUF model once. Examples:</p>
+        <pre>REM Known-working 1.5B baseline
+llama-server -hf Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
+
+REM Better 3B model tested successfully on this laptop
+llama-server -hf Qwen/Qwen2.5-Coder-3B-Instruct-GGUF:Q4_K_M</pre>
+        <p>Wait for the download to reach 100% and for llama.cpp to report <code>model loaded</code>. The model is now cached. Press <code>Ctrl+C</code>; you do not need to use that <code>-hf</code> command again unless you deliberately remove the cached model.</p>
+
+        <p><b>11. Restart llama.cpp in TGAIC router mode.</b> After adding models, return to the normal TGAIC server command:</p>
+        <pre>set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192</pre>
+        <p>Notice that this command contains <b>no <code>-hf</code> and no <code>-m</code></b>. That is intentional. llama.cpp is now acting as the model router instead of immediately loading one specific model. Start the bridge, open TGAIC, and click <b>Refresh Models</b>. The cached models should appear in the Local Model Manager and can be loaded from the page.</p>
+
+        <p><b>12. What we verified.</b> We downloaded Qwen2.5-Coder 1.5B and 3B <code>Q4_K_M</code> models with <code>LLAMA_CACHE=C:\Models</code>, then confirmed both appear after restarting llama-server in generic router mode. We also successfully ran a roughly <b>3.4 GB / 6B-class GGUF</b> on a machine with only <b>2 GB of GPU VRAM</b>. That is an important practical result: a GGUF does not have to fit entirely in VRAM. llama.cpp can place some work on the GPU and use system RAM/CPU for the remainder. Performance still depends on the model, quantization, context size, total system RAM, memory bandwidth, and how much can be offloaded. The repeatable workflow remains: <b>download/cache once → restart router → Refresh Models → Load Selected → chat</b>.</p>
+
+        <p><b>13. Cache versus <code>--models-dir</code>.</b> These are related but different. <code>LLAMA_CACHE=C:\Models</code> tells llama.cpp where its managed/downloaded cache lives. <code>--models-dir "C:\SomeFolder"</code> is useful when you already have manually managed GGUF files in a directory and want the router to discover them. For the normal TGAIC workflow, use <code>LLAMA_CACHE=C:\Models</code>. You can still add <code>--models-dir</code> later for a separate collection of manually downloaded GGUF files.</p>
+
+        <p><b>14. Where to find models online.</b> There is no small fixed "full list" built into llama.cpp. Hugging Face is the primary catalog and contains a very large, changing collection of GGUF models. Use these references:</p>
+        <ul>
+          <li><a href="https://huggingface.co/models?library=gguf" target="_blank" rel="noopener">Hugging Face — all models filtered to the GGUF library ↗</a> — the broad catalog. Search within it for terms such as <code>coder</code>, <code>Qwen</code>, <code>Gemma</code>, or a parameter size.</li>
+          <li><a href="https://huggingface.co/models?search=GGUF" target="_blank" rel="noopener">Hugging Face — GGUF model search ↗</a> — another convenient browse/search view.</li>
+          <li><a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/models.md" target="_blank" rel="noopener">llama.cpp — Obtaining and quantizing models ↗</a> — official llama.cpp model documentation, including the <code>-hf user/model[:quant]</code> syntax.</li>
+          <li><a href="https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF" target="_blank" rel="noopener">Qwen2.5-Coder 3B Instruct GGUF ↗</a> — the 3B coder model now tested on this laptop.</li>
+          <li><a href="https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF" target="_blank" rel="noopener">Qwen2.5-Coder 7B Instruct GGUF ↗</a> — a substantially larger next step for stronger hardware.</li>
+        </ul>
+
+        <p><b>15. Reading a Hugging Face GGUF model page.</b> Prefer an <b>Instruct</b> or chat-tuned model for TGAIC rather than a base/pretraining model. Confirm that the repository contains GGUF files and is compatible with llama.cpp. Model repositories commonly provide multiple quantizations. <code>Q4_K_M</code> is a useful starting point because it balances model size and quality. Higher-bit quantizations such as Q5/Q6/Q8 generally require more memory/disk but preserve more model information.</p>
+
+        <p><b>16. Model size versus VRAM.</b> Parameter count, GGUF file size, VRAM, and total system RAM are related but they are not the same limit. A model larger than available VRAM can still run because llama.cpp can split/offload work across GPU and CPU/system RAM. On the current 2 GB-VRAM test laptop, 1.5B and 3B models are proven, and a roughly 3.4 GB 6B-class coder/reasoning GGUF also runs acceptably. Treat the browser's file-size buckets as discovery aids rather than hard hardware limits. Larger models may load but become slower, consume more system RAM, or require a smaller context.</p>
+
+        <p><b>17. Copy-ready examples.</b></p>
+        <pre>REM Always establish the TGAIC cache in a new Command Prompt
+set LLAMA_CACHE=C:\Models
+
+REM 1.5B
+llama-server -hf Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
+
+REM 3B
+llama-server -hf Qwen/Qwen2.5-Coder-3B-Instruct-GGUF:Q4_K_M
+
+REM 7B - stronger hardware recommended
+llama-server -hf Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M
+
+REM Normal TGAIC router startup after downloads are complete
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+REM Inspect llama.cpp's cache from the command line
+llama-server -cl</pre>
+
+        <p><b>18. Important model-selection rule.</b> Do not assume every model shown on Hugging Face is suitable merely because it contains a GGUF. Check parameter count, quantization/file size, model architecture/support, total RAM/VRAM, and whether the repository contains companion files. Some multimodal models use an <code>mmproj</code> companion; other repositories may include optional MTP/NextN-style sidecars. A download completing successfully does <b>not</b> prove that the exact GGUF conversion can be loaded by the installed llama.cpp build. TGAIC therefore treats compatibility as advisory and defaults the Hugging Face browser to <b>Text GGUF only</b>.</p>
+
+
+        <p><b>19. Hugging Face Model Browser.</b> The online discovery panel searches GGUF repositories through the bridge. Enter a search such as <code>coder</code>, <code>Qwen</code>, or <code>Gemma</code>. Search criteria do not contact Hugging Face until you click <b>Search Models</b>. Page filling is handled by the bridge: it continues through Hub results until it has enough matching repositories for the requested TGAIC page or the Hub search is exhausted. Sort choices are only those supported by the Hugging Face model API, so sorting applies to the global Hub traversal rather than merely reordering one local page. The bridge also detects <code>mmproj</code>/MTP companion files and adds a compatibility hint. Use <b>Copy -hf</b> to copy the standard cache command plus the generated <code>llama-server -hf user/repository:quant</code> command. Downloading remains intentionally manual: stop router mode, paste/run the command, wait for the model to cache/load, stop that model with <code>Ctrl+C</code>, restart generic router mode, then use <b>Refresh Models</b>.</p>
+
+        <p class="note"><b>Current recommended routine:</b> use the Hugging Face GGUF catalog to discover a model → copy its <code>user/repository:quant</code> identifier → set <code>LLAMA_CACHE=C:\Models</code> → run it once with <code>llama-server -hf ...</code> to download/cache it → Ctrl+C → restart the generic router → Refresh Models in TGAIC → Load Selected.</p>
+      </div>
+    
+        <div class="setupSection">
+          <h3>20. Hugging Face authentication, rate limits, and efficient search</h3>
+          <p>Hugging Face allows anonymous API access, but larger or repeated searches can be rate limited. TGAIC supports optional authenticated requests in two ways.</p>
+          <p><b>Option A — HTML token field:</b> enter an Hugging Face access token in the <b>HF Token</b> field in the model browser. The page sends it only to <code>http://127.0.0.1:8787</code> in the <code>X-HF-Token</code> header. The bridge converts it to a Hugging Face Bearer token. TGAIC does not save this value to localStorage, sessionStorage, cookies, or a file; reloading or closing the page clears it.</p>
+          <p><b>Option B — environment variable:</b></p>
+          <pre>set HF_TOKEN=hf_your_token_here
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1</pre>
+          <p>If both are present, the token entered in the HTML page takes precedence for that request. The bridge never prints the token itself.</p>
+          <p><b>API efficiency:</b> the Hugging Face search response already includes model tags. The bridge first keeps only results tagged <code>gguf</code> (or clearly named as GGUF) and only then requests repository trees to discover exact GGUF filenames and sizes. This avoids a tree API call for every arbitrary model returned by the search.</p>
+          <p><b>Pagination:</b> <b>Results per page</b> defaults to 10 and can be set from 1 to 100. A TGAIC page is result-oriented rather than tied one-for-one to a Hugging Face API page: the bridge follows as many Hub pages as necessary to collect the requested number of matching GGUF repositories, stopping early only when Hugging Face has no more results. The continuation cursor also remembers an offset within a Hub page so matches are not skipped between TGAIC pages.</p>
+        </div>
+        <div class="setupSection">
+          <h3>21. Model compatibility and failed loads</h3>
+          <p>A completed Hugging Face download and a valid <code>.gguf</code> filename are not a guarantee that the model will load. We encountered a Qwen3.5-derived GGUF that downloaded successfully but failed during llama.cpp tensor validation with a missing-tensor error. That type of failure happens <b>after</b> download and is distinct from cache/network problems.</p>
+          <p>TGAIC's compatibility column is therefore a <b>pre-download hint</b>, not a certification. It can identify obvious text versus multimodal repositories and companion files, and it can flag newer architecture families for extra caution, but the definitive compatibility test is still whether the installed llama.cpp build loads the exact GGUF conversion.</p>
+          <p>On Windows, llama.cpp may print <code>failed to create symlink: A required privilege is not held by the client</code> followed by <code>switching to degraded mode</code>. If the process continues afterward, that warning by itself is not the fatal model-load error; inspect the later llama.cpp messages for the actual failure.</p>
+        </div>
+
+        <div class="setupSection">
+          <h3>22. Markdown responses</h3>
+          <p>Assistant output is rendered as safe Markdown in the browser. Common headings, bold/italic text, numbered and bulleted lists, inline code, fenced code blocks, blockquotes, links, horizontal rules, and basic Markdown tables are supported. Fenced code blocks include a language label and <b>Copy</b> button. Model-produced HTML is escaped rather than trusted/executed.</p>
+        </div>
+
+        <div class="setupSection">
+          <h3>23. Internet access and tool boundaries</h3>
+          <p>The local GGUF model itself does <b>not</b> browse the web, scrape sites, or search the Internet. Current chat inference is local. The Hugging Face Model Browser is a specific bridge feature that performs Hub API requests only when you initiate a model search. General web search, arbitrary URL fetching, autonomous browsing, image generation, and reference-file/RAG tooling are not currently part of TGAIC.</p>
+        </div>
+
+        <div class="setupSection">
+          <h3>24. Repository and project documentation</h3>
+          <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding or <b>GitHub / README ↗</b> in the footer to open the public project repository. The repository is intended to contain the standalone HTML application, PowerShell bridge, README, GitHub Pages launcher, release history, and related project resources.</p>
+        </div>
+</details>
+  </section>
+
+  <main class="chat" id="chat">
+    <div class="msg system"><span class="who">TGAIC</span>Connect to a local model server, then start coding. Conversation history stays in this page until you click New Chat or reload.</div>
+  </main>
+
+  <section class="card composer">
+    <label for="prompt">Message</label>
+    <textarea id="prompt" placeholder="Ask the local coding model something…"></textarea>
+    <div class="actions">
+      <div class="leftActions">
+        <button id="clearDisplayBtn" type="button">Clear Display</button>
+        <button id="copyLastBtn" type="button">Copy Last Response</button>
+      </div>
+      <div class="rightActions">
+        <button id="stopBtn" type="button" disabled>Stop</button>
+        <button class="primary" id="sendBtn" type="button" disabled>Send</button>
+      </div>
+    </div>
+    <div class="note">Enter sends. Shift+Enter inserts a new line. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
+  </section>
+
+  <footer class="app-footer">
+    <span>© <span id="year"></span> mikejamesgreco.me LLC. All rights reserved. <span id="version"></span></span>
+    <span><a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer">GitHub / README ↗</a></span>
+    <span>Single-file conversation UI · PowerShell localhost bridge · native GPU runtime</span>
+  </footer>
+</div>
+
+<script>
+(()=>{'use strict';
+const APP_VERSION='v0020';
+const $=id=>document.getElementById(id);
+const ui={
+  endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
+  chat:$('chat'),prompt:$('prompt'),send:$('sendBtn'),stop:$('stopBtn'),
+  newChat:$('newChatBtn'),clearDisplay:$('clearDisplayBtn'),copyLast:$('copyLastBtn'),
+  availableModel:$('availableModelSelect'),refreshModels:$('refreshModelsBtn'),loadModel:$('loadModelBtn'),unloadModel:$('unloadModelBtn'),modelTable:$('modelTableBody'),modelManagerStatus:$('modelManagerStatus'),
+  hfSearch:$('hfSearch'),hfToken:$('hfToken'),hfLimit:$('hfLimit'),hfQuant:$('hfQuantFilter'),hfSize:$('hfSizeFilter'),hfType:$('hfTypeFilter'),hfSort:$('hfSort'),hfSearchBtn:$('hfSearchBtn'),hfTable:$('hfTableBody'),hfStatus:$('hfStatus'),hfCopyCache:$('hfCopyCacheBtn'),hfPrev:$('hfPrevBtn'),hfNext:$('hfNextBtn'),hfPageLabel:$('hfPageLabel')
+};
+$('year').textContent=new Date().getFullYear();
+$('version').textContent=APP_VERSION;
+$('helpVersion').textContent=APP_VERSION;
+document.title=`TGAIC AI Coder ${APP_VERSION}`;
+
+let connected=false;
+let history=[];
+let controller=null;
+let lastAssistant='';
+
+function escapeHtml(value){
+  return String(value??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function renderInlineMarkdown(text){
+  let s=escapeHtml(text);
+
+  // Protect inline-code spans while processing other inline markup.
+  const codes=[];
+  s=s.replace(/`([^`\n]+)`/g,(_,code)=>{
+    const token=`\u0000CODE${codes.length}\u0000`;
+    codes.push(`<code>${code}</code>`);
+    return token;
+  });
+
+  // Safe links: only http(s) URLs are made clickable.
+  s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  s=s.replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/__([^_\n]+)__/g,'<strong>$1</strong>');
+  s=s.replace(/~~([^~\n]+)~~/g,'<del>$1</del>');
+  s=s.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/g,'$1<em>$2</em>');
+  s=s.replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g,'$1<em>$2</em>');
+
+  codes.forEach((code,i)=>{
+    s=s.replace(`\u0000CODE${i}\u0000`,code);
+  });
+  return s;
+}
+function renderMarkdownTable(lines){
+  if(lines.length<2)return null;
+  const split=line=>line.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+  const head=split(lines[0]);
+  const sep=split(lines[1]);
+  if(head.length<2||sep.length!==head.length)return null;
+  if(!sep.every(x=>/^:?-{3,}:?$/.test(x)))return null;
+
+  const body=lines.slice(2).map(split).filter(r=>r.length===head.length);
+  let out='<table><thead><tr>';
+  out+=head.map(x=>`<th>${renderInlineMarkdown(x)}</th>`).join('');
+  out+='</tr></thead><tbody>';
+  for(const row of body)out+='<tr>'+row.map(x=>`<td>${renderInlineMarkdown(x)}</td>`).join('')+'</tr>';
+  out+='</tbody></table>';
+  return out;
+}
+function renderMarkdown(markdown){
+  const source=String(markdown??'').replace(/\r\n?/g,'\n');
+
+  // Pull fenced code blocks out first so Markdown characters inside code
+  // are never interpreted as formatting or HTML.
+  const codeBlocks=[];
+  let text=source.replace(/```([^\n`]*)\n?([\s\S]*?)(?:```|$)/g,(_,lang,code)=>{
+    const token=`\u0000BLOCK${codeBlocks.length}\u0000`;
+    const label=String(lang||'').trim().split(/\s+/)[0]||'code';
+    codeBlocks.push(
+      `<div class="md-code">`+
+        `<div class="md-code-head"><span class="md-code-lang">${escapeHtml(label)}</span>`+
+        `<button type="button" class="md-copy">Copy</button></div>`+
+        `<pre><code>${escapeHtml(code.replace(/\n$/,''))}</code></pre>`+
+      `</div>`
+    );
+    return `\n${token}\n`;
+  });
+
+  const lines=text.split('\n');
+  const out=[];
+  let i=0;
+  let paragraph=[];
+  const flushParagraph=()=>{
+    if(!paragraph.length)return;
+    out.push(`<p>${paragraph.map(renderInlineMarkdown).join('<br>')}</p>`);
+    paragraph=[];
+  };
+
+  while(i<lines.length){
+    const line=lines[i];
+    const trimmed=line.trim();
+
+    if(!trimmed){flushParagraph();i++;continue;}
+
+    const blockMatch=trimmed.match(/^\u0000BLOCK(\d+)\u0000$/);
+    if(blockMatch){
+      flushParagraph();
+      out.push(codeBlocks[Number(blockMatch[1])]||'');
+      i++;continue;
+    }
+
+    const heading=line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if(heading){
+      flushParagraph();
+      const level=heading[1].length;
+      out.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      i++;continue;
+    }
+
+    if(/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)){
+      flushParagraph();out.push('<hr>');i++;continue;
+    }
+
+    // GitHub-style tables.
+    if(i+1<lines.length && line.includes('|')){
+      let end=i+2;
+      while(end<lines.length && lines[end].includes('|') && lines[end].trim())end++;
+      const table=renderMarkdownTable(lines.slice(i,end));
+      if(table){
+        flushParagraph();out.push(table);i=end;continue;
+      }
+    }
+
+    // Consecutive blockquote lines.
+    if(/^\s*>\s?/.test(line)){
+      flushParagraph();
+      const quote=[];
+      while(i<lines.length && /^\s*>\s?/.test(lines[i])){
+        quote.push(lines[i].replace(/^\s*>\s?/,''));
+        i++;
+      }
+      out.push(`<blockquote>${quote.map(renderInlineMarkdown).join('<br>')}</blockquote>`);
+      continue;
+    }
+
+    // Consecutive unordered/ordered list lines. Basic nesting is intentionally
+    // conservative; model-generated flat lists render cleanly and safely.
+    const ul=/^\s*[-+*]\s+(.+)$/.exec(line);
+    const ol=/^\s*\d+[.)]\s+(.+)$/.exec(line);
+    if(ul||ol){
+      flushParagraph();
+      const ordered=!!ol;
+      const items=[];
+      const pattern=ordered?/^\s*\d+[.)]\s+(.+)$/:/^\s*[-+*]\s+(.+)$/;
+      while(i<lines.length){
+        const m=pattern.exec(lines[i]);
+        if(!m)break;
+        items.push(m[1]);i++;
+      }
+      const tag=ordered?'ol':'ul';
+      out.push(`<${tag}>${items.map(x=>`<li>${renderInlineMarkdown(x)}</li>`).join('')}</${tag}>`);
+      continue;
+    }
+
+    paragraph.push(line);
+    i++;
+  }
+  flushParagraph();
+  return out.join('');
+}
+function setMessageBody(div,text){
+  const body=div.querySelector('.body');
+  if(!body)return;
+  if(div.classList.contains('assistant')){
+    // The model response is treated as Markdown, never as trusted HTML.
+    body.innerHTML=renderMarkdown(text);
+  }else{
+    body.textContent=text;
+  }
+}
+function appendMessage(role,text){
+  const div=document.createElement('div');
+  div.className=`msg ${role}`;
+  const who=document.createElement('span');
+  who.className='who';
+  who.textContent=role==='user'?'You':role==='assistant'?'Local model':'TGAIC';
+  div.appendChild(who);
+  const body=document.createElement('span');
+  body.className='body';
+  div.appendChild(body);
+  setMessageBody(div,text);
+  ui.chat.appendChild(div);
+  ui.chat.scrollTop=ui.chat.scrollHeight;
+  return div;
+}
+function setMessage(div,text){
+  setMessageBody(div,text);
+  ui.chat.scrollTop=ui.chat.scrollHeight;
+}
+function setStatus(text,kind=''){
+  ui.badge.textContent=text;
+  ui.badge.className='badge'+(kind?` ${kind}`:'');
+}
+function api(path){
+  return ui.endpoint.value.trim().replace(/\/+$/,'')+path;
+}
+
+let availableModels=[];
+let selectedAvailableModel='';
+
+function bridgeBase(){
+  return ui.endpoint.value.trim().replace(/\/v1\/?$/,'');
+}
+function formatBytes(n){
+  n=Number(n);
+  if(!Number.isFinite(n)||n<=0)return '—';
+  const units=['B','KB','MB','GB','TB'];
+  let i=0;
+  while(n>=1024&&i<units.length-1){n/=1024;i++;}
+  return `${n>=10||i===0?n.toFixed(0):n.toFixed(1)} ${units[i]}`;
+}
+function modelSize(m){
+  return m?.size ?? m?.meta?.size ?? m?.metadata?.size ?? m?.model_size ?? null;
+}
+function modelStatusValue(m){
+  return m?.status?.value || m?.status || 'unknown';
+}
+function selectAvailableModel(id){
+  selectedAvailableModel=id||'';
+  ui.availableModel.value=selectedAvailableModel;
+  ui.loadModel.disabled=!selectedAvailableModel;
+  ui.unloadModel.disabled=!selectedAvailableModel;
+  for(const tr of ui.modelTable.querySelectorAll('tr[data-model-id]')){
+    tr.classList.toggle('selected',tr.dataset.modelId===selectedAvailableModel);
+  }
+}
+function renderAvailableModels(){
+  ui.availableModel.innerHTML='';
+  if(!availableModels.length){
+    ui.availableModel.innerHTML='<option value="">No local models reported</option>';
+    ui.modelTable.innerHTML='<tr><td colspan="4" class="muted">No models were returned. If llama-server was started with a specific -hf/-m model, stop it and start router mode without specifying a model.</td></tr>';
+    selectAvailableModel('');
+    return;
+  }
+  for(const m of availableModels){
+    const o=document.createElement('option');
+    o.value=m.id||'';
+    o.textContent=`${m.id||'(unnamed)'} · ${formatBytes(modelSize(m))} · ${modelStatusValue(m)}`;
+    ui.availableModel.appendChild(o);
+  }
+  ui.modelTable.innerHTML='';
+  for(const m of availableModels){
+    const tr=document.createElement('tr');
+    tr.dataset.modelId=m.id||'';
+    const vals=[
+      m.id||'—',
+      formatBytes(modelSize(m)),
+      modelStatusValue(m),
+      m.path||m.file||m.source||'—'
+    ];
+    vals.forEach((v,i)=>{
+      const td=document.createElement('td');
+      td.textContent=String(v);
+      if(i===3)td.className='muted';
+      tr.appendChild(td);
+    });
+    tr.addEventListener('click',()=>selectAvailableModel(m.id||''));
+    ui.modelTable.appendChild(tr);
+  }
+  const loaded=availableModels.find(m=>modelStatusValue(m)==='loaded');
+  selectAvailableModel((loaded||availableModels[0])?.id||'');
+}
+async function refreshAvailableModels(){
+  ui.refreshModels.disabled=true;
+  ui.modelManagerStatus.textContent='Asking llama.cpp router for local models…';
+  try{
+    const r=await fetch(bridgeBase()+'/models?reload=1');
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    const data=await r.json();
+    availableModels=Array.isArray(data?.data)?data.data:[];
+    renderAvailableModels();
+    ui.modelManagerStatus.textContent=`${availableModels.length} local model${availableModels.length===1?'':'s'} reported by llama.cpp.`;
+  }catch(err){
+    availableModels=[];
+    renderAvailableModels();
+    ui.modelManagerStatus.textContent=`Model list unavailable: ${err.message||err}. Start llama-server in router mode to use this panel.`;
+  }finally{
+    ui.refreshModels.disabled=false;
+  }
+}
+async function loadSelectedModel(){
+  const id=selectedAvailableModel||ui.availableModel.value;
+  if(!id)return;
+  ui.loadModel.disabled=true;
+  ui.modelManagerStatus.textContent=`Loading ${id}…`;
+  try{
+    const r=await fetch(bridgeBase()+'/models/load',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:id})
+    });
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    ui.model.value=id;
+    ui.modelManagerStatus.textContent=`Loaded ${id}. TGAIC will use it for the next prompt.`;
+    await refreshAvailableModels();
+    if(!connected)await connect();
+  }catch(err){
+    ui.modelManagerStatus.textContent=`Load failed: ${err.message||err}`;
+  }finally{
+    ui.loadModel.disabled=!selectedAvailableModel;
+  }
+}
+async function unloadSelectedModel(){
+  const id=selectedAvailableModel||ui.availableModel.value;
+  if(!id)return;
+  ui.unloadModel.disabled=true;
+  ui.modelManagerStatus.textContent=`Unloading ${id}…`;
+  try{
+    const r=await fetch(bridgeBase()+'/models/unload',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:id})
+    });
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    if(ui.model.value.trim()===id){
+      ui.model.value='';
+      connected=false;
+      ui.send.disabled=true;
+      setStatus('Model unloaded');
+    }
+    ui.modelManagerStatus.textContent=`Unloaded ${id}.`;
+    await refreshAvailableModels();
+  }catch(err){
+    ui.modelManagerStatus.textContent=`Unload failed: ${err.message||err}`;
+  }finally{
+    ui.unloadModel.disabled=!selectedAvailableModel;
+  }
+}
+
+
+let hfModels=[];
+let hfPageNumber=1;
+let hfCurrentCursor={url:'',offset:0};
+let hfNextCursor=null;
+let hfPreviousCursors=[];
+
+function formatCount(n){
+  return (Number(n)||0).toLocaleString();
+}
+function formatDate(v){
+  if(!v)return '—';
+  const d=new Date(v);
+  return Number.isNaN(d.getTime())?'—':d.toLocaleDateString();
+}
+function hfPreferredRows(models){
+  const wanted=(ui.hfQuant.value||'').toUpperCase();
+  const rows=[];
+  for(const m of models){
+    const files=Array.isArray(m.ggufFiles)?m.ggufFiles:[];
+    let chosen=files;
+    if(wanted){
+      const exact=files.filter(f=>(f.quant||'').toUpperCase()===wanted);
+      chosen=exact.length?exact.slice(0,1):files.slice(0,1);
+    }
+    for(const f of chosen){
+      rows.push({
+        repo:m.id||'',downloads:Number(m.downloads)||0,likes:Number(m.likes)||0,
+        lastModified:m.lastModified||'',quant:f.quant||'GGUF',size:Number(f.size)||0,file:f.file||'',
+        modelType:m.modelType||'text',compatibility:m.compatibility||'Text GGUF · unverified',
+        compatibilityLevel:m.compatibilityLevel||'info',hasMmproj:!!m.hasMmproj,hasMtp:!!m.hasMtp
+      });
+    }
+  }
+  return rows;
+}
+function filterHfRowsBySize(rows){
+  const mode=ui.hfSize.value||'';
+  if(!mode)return rows;
+  const GB=1024*1024*1024;
+  return rows.filter(r=>{
+    const gb=(Number(r.size)||0)/GB;
+    if(!r.size)return false;
+    if(mode==='0-1')return gb<1;
+    if(mode==='1-2')return gb>=1&&gb<2;
+    if(mode==='2-4')return gb>=2&&gb<4;
+    if(mode==='4-8')return gb>=4&&gb<8;
+    if(mode==='8-16')return gb>=8&&gb<16;
+    if(mode==='16-32')return gb>=16&&gb<32;
+    if(mode==='32+')return gb>=32;
+    return true;
+  });
+}
+function sortHfRows(rows){
+  // Preserve the global ordering returned by Hugging Face.
+  // Sorting a single browser page locally would be misleading.
+  return [...rows];
+}
+function hfCommand(row){
+  const suffix=row.quant&&row.quant!=='GGUF'?`:${row.quant}`:'';
+  return `llama-server -hf ${row.repo}${suffix}`;
+}
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); }
+  catch{
+    const ta=document.createElement('textarea');
+    ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+  }
+}
+function renderHfRows(){
+  const rows=sortHfRows(filterHfRowsBySize(hfPreferredRows(hfModels)));
+  ui.hfTable.innerHTML='';
+  if(!rows.length){
+    ui.hfTable.innerHTML='<tr><td colspan="8" class="muted">No matching GGUF files were found in the returned repositories.</td></tr>';
+    return;
+  }
+  for(const row of rows){
+    const tr=document.createElement('tr');
+    const modelTd=document.createElement('td');
+    const link=document.createElement('a');
+    link.href=`https://huggingface.co/${row.repo}`;
+    link.target='_blank';link.rel='noopener';link.textContent=row.repo;
+    modelTd.appendChild(link);
+    if(row.file){const f=document.createElement('div');f.className='muted';f.textContent=row.file;modelTd.appendChild(f);}
+    tr.appendChild(modelTd);
+    for(const value of [row.quant,formatBytes(row.size),row.compatibility,formatCount(row.downloads),formatCount(row.likes),formatDate(row.lastModified)]){
+      const td=document.createElement('td');td.textContent=value||'—';tr.appendChild(td);
+    }
+    const actionTd=document.createElement('td');
+    const copyBtn=document.createElement('button');copyBtn.type='button';copyBtn.textContent='Copy -hf';copyBtn.title=hfCommand(row);
+    copyBtn.addEventListener('click',async()=>{
+      await copyText(`set LLAMA_CACHE=C:\\Models\r\n${hfCommand(row)}`);
+      ui.hfStatus.textContent=`Copied download command for ${row.repo} (${row.quant}).`;
+    });
+    actionTd.appendChild(copyBtn);
+    const cmd=document.createElement('div');cmd.className='hfCommand muted';cmd.textContent=hfCommand(row);actionTd.appendChild(cmd);
+    tr.appendChild(actionTd);ui.hfTable.appendChild(tr);
+  }
+}
+async function fetchHuggingFacePage(cursor={url:'',offset:0},navigation='initial'){
+  const q=ui.hfSearch.value.trim();
+  ui.hfSearchBtn.disabled=true;
+  ui.hfPrev.disabled=true;
+  ui.hfNext.disabled=true;
+  ui.hfStatus.textContent='Searching Hugging Face until this TGAIC page is filled…';
+  try{
+    const url=new URL(bridgeBase()+'/hf/models');
+    const requestedLimit=Math.max(1,Math.min(100,parseInt(ui.hfLimit.value||'10',10)||10));
+    ui.hfLimit.value=String(requestedLimit);
+
+    if(cursor?.url){
+      url.searchParams.set('cursorUrl',cursor.url);
+      url.searchParams.set('cursorOffset',String(Math.max(0,Number(cursor.offset)||0)));
+    }else if(q){
+      url.searchParams.set('search',q);
+    }
+
+    // Send active display filters to the bridge so "10 per page" means
+    // 10 repositories that can actually survive the current filters.
+    if(ui.hfQuant.value)url.searchParams.set('quant',ui.hfQuant.value);
+    if(ui.hfSize.value)url.searchParams.set('size',ui.hfSize.value);
+    if(ui.hfType.value)url.searchParams.set('type',ui.hfType.value);
+    url.searchParams.set('limit',String(requestedLimit));
+    if(ui.hfSort.value)url.searchParams.set('sort',ui.hfSort.value);
+
+    const hfHeaders={};
+    const hfToken=(ui.hfToken.value||'').trim();
+    if(hfToken)hfHeaders['X-HF-Token']=hfToken;
+
+    const r=await fetch(url,{headers:hfHeaders,cache:'no-store'});
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+
+    const data=await r.json();
+    hfModels=Array.isArray(data?.data)?data.data:[];
+
+    if(navigation==='initial'){
+      hfPageNumber=1;
+      hfPreviousCursors=[];
+      hfCurrentCursor={url:'',offset:0};
+    }else if(navigation==='next'){
+      hfPageNumber++;
+      hfCurrentCursor={url:cursor?.url||'',offset:Number(cursor?.offset)||0};
+    }else if(navigation==='prev'){
+      hfPageNumber=Math.max(1,hfPageNumber-1);
+      hfCurrentCursor={url:cursor?.url||'',offset:Number(cursor?.offset)||0};
+    }
+
+    hfNextCursor=data?.hasNextPage
+      ? {url:data.nextCursorUrl||'',offset:Number(data.nextCursorOffset)||0}
+      : null;
+
+    renderHfRows();
+
+    const preferred=hfPreferredRows(hfModels);
+    const rows=filterHfRowsBySize(preferred);
+    const withSize=rows.filter(x=>x.size>0).length;
+    const inspected=Number(data?.sourceRepoCount)||0;
+    const candidates=Number(data?.ggufCandidateCount)||0;
+    const hubPages=Number(data?.hubPagesFetched)||0;
+    const authMode=data?.hfAuthMode?` · HF auth: ${data.hfAuthMode}`:'';
+
+    ui.hfPageLabel.textContent=`Page ${hfPageNumber}`;
+    ui.hfPrev.disabled=hfPreviousCursors.length===0;
+    ui.hfNext.disabled=!hfNextCursor;
+
+    const exhausted=data?.searchExhausted?' · end of search':'';
+    ui.hfStatus.textContent=`TGAIC page ${hfPageNumber} · ${rows.length.toLocaleString()} displayed result${rows.length===1?'':'s'} · ${inspected.toLocaleString()} Hub repos scanned across ${hubPages.toLocaleString()} Hub page${hubPages===1?'':'s'} · ${candidates.toLocaleString()} GGUF candidates · ${withSize.toLocaleString()} with reported file size${exhausted}${authMode}.`;
+  }catch(err){
+    hfModels=[];renderHfRows();
+    ui.hfStatus.textContent=`Hugging Face search failed: ${err.message||err}`;
+    ui.hfPrev.disabled=hfPreviousCursors.length===0;
+    ui.hfNext.disabled=!hfNextCursor;
+    throw err;
+  }finally{
+    ui.hfSearchBtn.disabled=false;
+  }
+}
+
+
+function markHfSearchCriteriaChanged(){
+  if(hfModels.length){
+    ui.hfStatus.textContent='Search criteria changed — click Search Models to refresh results.';
+  }else{
+    ui.hfStatus.textContent='Ready — click Search Models to search Hugging Face.';
+  }
+}
+async function searchHuggingFace(){
+  hfPageNumber=1;
+  hfCurrentCursor={url:'',offset:0};
+  hfNextCursor=null;
+  hfPreviousCursors=[];
+  ui.hfPageLabel.textContent='Page 1';
+  try{await fetchHuggingFacePage(hfCurrentCursor,'initial');}catch{}
+}
+
+async function nextHuggingFacePage(){
+  if(!hfNextCursor)return;
+  const prior={...hfCurrentCursor};
+  const target={...hfNextCursor};
+  try{
+    await fetchHuggingFacePage(target,'next');
+    hfPreviousCursors.push(prior);
+    ui.hfPrev.disabled=hfPreviousCursors.length===0;
+  }catch{}
+}
+
+async function previousHuggingFacePage(){
+  if(!hfPreviousCursors.length)return;
+  const target={...hfPreviousCursors[hfPreviousCursors.length-1]};
+  const oldCurrent={...hfCurrentCursor};
+  try{
+    await fetchHuggingFacePage(target,'prev');
+    hfPreviousCursors.pop();
+    ui.hfPrev.disabled=hfPreviousCursors.length===0;
+  }catch{
+    hfCurrentCursor=oldCurrent;
+  }
+}
+
+async function connect(){
+  ui.connect.disabled=true;
+  setStatus('Checking…');
+  try{
+    // The TGAIC bridge exposes /health in addition to the proxied /v1 API.
+    const base=ui.endpoint.value.trim().replace(/\/v1\/?$/,'');
+    try{
+      const h=await fetch(base+'/health');
+      if(h.ok){
+        const hj=await h.json();
+        appendMessage('system',`Bridge ready. Direct-file connection active. Upstream: ${hj.upstream||'local model server'}.`);
+      }
+    }catch{}
+    const r=await fetch(api('/models'));
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    const data=await r.json();
+    const models=(data.data||[]).map(x=>x.id).filter(Boolean);
+    if(!ui.model.value.trim()&&models.length)ui.model.value=models[0];
+    connected=true;
+    ui.send.disabled=false;
+    setStatus(models.length?`Connected · ${models.length} model${models.length===1?'':'s'}`:'Connected','good');
+    appendMessage('system',`Connected to ${ui.endpoint.value.trim()}${ui.model.value.trim()?` using ${ui.model.value.trim()}`:''}.`);
+  }catch(err){
+    connected=false;ui.send.disabled=true;
+    setStatus('Connection failed','bad');
+    appendMessage('system',`Could not connect to the local model server: ${err.message||err}`);
+  }finally{ui.connect.disabled=false}
+}
+async function send(){
+  if(!connected||controller)return;
+  const text=ui.prompt.value.trim();
+  const model=ui.model.value.trim();
+  if(!text||!model)return;
+  ui.prompt.value='';
+  appendMessage('user',text);
+  const out=appendMessage('assistant','…');
+  ui.send.disabled=true;ui.stop.disabled=false;
+  controller=new AbortController();
+  const messages=[
+    {role:'system',content:'You are TGAIC, a serious local coding assistant. Be precise, practical, and code-focused. Prefer complete working examples when appropriate.'},
+    ...history,
+    {role:'user',content:text}
+  ];
+  let full='';
+  try{
+    const r=await fetch(api('/chat/completions'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model,messages,temperature:0.2,stream:true}),
+      signal:controller.signal
+    });
+    if(!r.ok)throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+    if(!r.body)throw new Error('Streaming response body unavailable.');
+    const reader=r.body.getReader();
+    const dec=new TextDecoder();
+    let buffer='';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buffer+=dec.decode(value,{stream:true});
+      const lines=buffer.split(/\r?\n/);
+      buffer=lines.pop()||'';
+      for(const line of lines){
+        const s=line.trim();
+        if(!s.startsWith('data:'))continue;
+        const payload=s.slice(5).trim();
+        if(!payload||payload==='[DONE]')continue;
+        try{
+          const j=JSON.parse(payload);
+          const delta=j.choices?.[0]?.delta?.content||'';
+          if(delta){full+=delta;setMessage(out,full);}
+        }catch{}
+      }
+    }
+    if(!full)setMessage(out,'[No response text returned]');
+    lastAssistant=full;
+    history.push({role:'user',content:text},{role:'assistant',content:full});
+  }catch(err){
+    if(err.name==='AbortError'){
+      setMessage(out,full||'[Generation stopped]');
+      if(full){
+        lastAssistant=full;
+        history.push({role:'user',content:text},{role:'assistant',content:full});
+      }
+    }else{
+      setMessage(out,`Error: ${err.message||err}`);
+      setStatus('Request failed','bad');
+    }
+  }finally{
+    controller=null;ui.stop.disabled=true;ui.send.disabled=!connected;
+  }
+}
+
+function disconnect(){
+  if(controller){
+    try{controller.abort();}catch{}
+    controller=null;
+  }
+  connected=false;
+  ui.send.disabled=true;
+  ui.stop.disabled=true;
+  ui.disconnect.disabled=true;
+  setStatus('Disconnected');
+  appendMessage('system','Disconnected from the model endpoint. The bridge and llama.cpp are still running.');
+}
+
+async function stopBridge(){
+  if(controller){
+    try{controller.abort();}catch{}
+    controller=null;
+  }
+  const base=ui.endpoint.value.trim().replace(/\/v1\/?$/,'');
+  try{
+    await fetch(base+'/shutdown',{method:'POST'});
+  }catch{}
+  connected=false;
+  ui.send.disabled=true;
+  ui.stop.disabled=true;
+  ui.disconnect.disabled=true;
+  setStatus('Bridge stopped');
+  appendMessage('system','Bridge stop requested. llama.cpp remains running separately.');
+}
+
+function newChat(){
+  history=[];lastAssistant='';
+  ui.chat.innerHTML='';
+  appendMessage('system','New local coding conversation started.');
+}
+ui.chat.addEventListener('click',async e=>{
+  const button=e.target.closest('.md-copy');
+  if(!button)return;
+  const code=button.closest('.md-code')?.querySelector('pre code')?.textContent||'';
+  if(!code)return;
+  try{
+    await navigator.clipboard.writeText(code);
+    const old=button.textContent;
+    button.textContent='Copied';
+    setTimeout(()=>{button.textContent=old;},1000);
+  }catch{
+    const ta=document.createElement('textarea');
+    ta.value=code;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');button.textContent='Copied';setTimeout(()=>{button.textContent='Copy';},1000);}catch{}
+    ta.remove();
+  }
+});
+
+ui.hfSearchBtn.addEventListener('click',searchHuggingFace);
+ui.hfSearch.addEventListener('input',markHfSearchCriteriaChanged);
+ui.hfToken.addEventListener('input',markHfSearchCriteriaChanged);
+ui.hfLimit.addEventListener('input',markHfSearchCriteriaChanged);
+ui.hfQuant.addEventListener('change',markHfSearchCriteriaChanged);
+ui.hfSize.addEventListener('change',markHfSearchCriteriaChanged);
+ui.hfType.addEventListener('change',markHfSearchCriteriaChanged);
+ui.hfSort.addEventListener('change',markHfSearchCriteriaChanged);
+
+ui.hfPrev.addEventListener('click',previousHuggingFacePage);
+ui.hfNext.addEventListener('click',nextHuggingFacePage);
+ui.hfSearch.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchHuggingFace();}});
+ui.hfQuant.addEventListener('change',renderHfRows);
+ui.hfSize.addEventListener('change',renderHfRows);
+ui.hfSort.addEventListener('change',renderHfRows);
+ui.hfCopyCache.addEventListener('click',async()=>{await copyText('set LLAMA_CACHE=C:\\Models');ui.hfStatus.textContent='Copied cache command.';});
+ui.refreshModels.addEventListener('click',refreshAvailableModels);
+ui.availableModel.addEventListener('change',()=>selectAvailableModel(ui.availableModel.value));
+ui.loadModel.addEventListener('click',loadSelectedModel);
+ui.unloadModel.addEventListener('click',unloadSelectedModel);
+ui.connect.addEventListener('click',connect);
+ui.disconnect.addEventListener('click',disconnect);
+ui.stopBridge.addEventListener('click',stopBridge);
+ui.send.addEventListener('click',send);
+ui.stop.addEventListener('click',()=>controller?.abort());
+ui.newChat.addEventListener('click',newChat);
+ui.clearDisplay.addEventListener('click',()=>{ui.chat.innerHTML='';appendMessage('system',`Display cleared. ${history.filter(x=>x.role==='user').length} prior turn(s) remain in conversation memory.`);});
+ui.copyLast.addEventListener('click',async()=>{if(lastAssistant)await navigator.clipboard.writeText(lastAssistant);});
+ui.prompt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+})();
+</script>
+</body>
+</html>
