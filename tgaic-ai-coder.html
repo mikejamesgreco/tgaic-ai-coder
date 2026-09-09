@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0023</title>
+<title>TGAIC AI Coder v0024</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -147,7 +147,17 @@ footer{
 .hfBrowser{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}
 .hfBrowser summary{cursor:pointer;padding:9px 10px;font-size:11px;font-weight:800;color:#334155}
 .hfBrowserBody{padding:0 10px 10px}
-.hfToolbar{display:grid;grid-template-columns:minmax(240px,2fr) minmax(150px,1fr) minmax(130px,1fr) auto;gap:7px;align-items:end;margin:8px 0}
+.hfToolbar{
+  display:grid;
+  grid-template-columns:minmax(250px,2fr) minmax(180px,1.15fr) 110px minmax(150px,1fr);
+  gap:8px;align-items:end;margin:8px 0
+}
+.hfToolbar > div{min-width:0}
+.hfToolbar input,.hfToolbar select,.hfToolbar button{height:35px}
+.hfToolbar .tiny{
+  margin-top:3px;font-size:9px;line-height:1.25;color:#94a3b8;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
 .hfTableWrap{overflow:auto;max-height:330px;border:1px solid var(--line);border-radius:6px;background:#fff}
 .hfTable{width:100%;border-collapse:collapse;font-size:11px}
 .hfTable th,.hfTable td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
@@ -201,6 +211,25 @@ footer{
 .app-footer a{color:#475569;font-weight:600;text-decoration:none}
 .app-footer a:hover{color:var(--blue);text-decoration:underline}
 .footer-sep{margin:0 7px;color:#cbd5e1}
+
+.modalback{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.42);z-index:100}
+.modalback.open{display:flex}
+.helpModal{width:min(980px,96vw);height:min(88vh,900px);display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 22px 60px rgba(15,23,42,.28);overflow:hidden}
+.helpHead{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);background:#fff}
+.helpHead strong{font-size:13px}.helpHead .spacer{flex:1}
+.helpScroll{flex:1 1 auto;min-height:0;overflow:auto;padding:14px 16px;font-size:11px;color:#475569;line-height:1.5}
+.helpScroll p{margin:7px 0}.helpScroll pre{margin:7px 0;padding:9px;background:#0f172a;color:#dbeafe;border-radius:7px;overflow:auto;font:10px/1.45 Consolas,Monaco,monospace}
+.helpScroll code{font-family:Consolas,Monaco,monospace}.helpScroll h3{margin:20px 0 7px;font-size:14px;color:#1f2937}.helpScroll ul{margin:7px 0 10px 20px;padding:0}
+.helpScroll a{color:var(--blue);font-weight:700;text-decoration:none}.helpScroll a:hover{text-decoration:underline}
+.helpActions{flex:0 0 auto;display:flex;justify-content:flex-end;padding:9px 12px;border-top:1px solid var(--line);background:#f8fafc}
+
+.chatSection{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 15px rgba(15,23,42,.04);overflow:hidden}
+.chatHead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line);background:#fff}
+.chatHead strong{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#475569}
+.chatHead span{font-size:10px;color:var(--muted)}
+.chatSection .chat{border:0;border-radius:0;box-shadow:none;min-height:380px;max-height:52vh}
+.chatSection .composer{border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
+
 </style>
 </head>
 <body>
@@ -215,6 +244,7 @@ footer{
     </div>
     <div class="controls">
       <span class="badge" id="statusBadge">Not connected</span>
+      <button id="helpBtn" type="button">Help</button>
       <button id="newChatBtn" type="button">New Chat</button>
     </div>
   </header>
@@ -232,7 +262,34 @@ footer{
       <div class="connectActions"><button class="primary" id="connectBtn" type="button">Connect</button><button id="disconnectBtn" type="button" disabled>Disconnect</button><button id="stopBridgeBtn" type="button">Stop Bridge</button></div>
     </div>
     <div class="note"><b>Important:</b> download this HTML file and run the local copy. The supported setup is to <b>double-click <code>tgaic-ai-coder.html</code> directly from disk</b> so TGAIC runs as a local <code>file://</code> page. The GitHub Pages copy is useful for viewing the project, but an HTTPS-hosted page may be blocked by the browser from calling the local plain-HTTP bridge on <b>127.0.0.1:8787</b>. The bridge supplies CORS headers and forwards OpenAI-compatible chat/model requests to llama.cpp on <b>127.0.0.1:8080/v1</b>. Chat inference stays local. The optional Hugging Face Model Browser is the current exception: when you explicitly click <b>Search Models</b>, the bridge contacts the Hugging Face Hub API to discover model repositories.</div>
-    <details class="modelManager" open>
+    
+  <section class="chatSection" aria-labelledby="chatWorkspaceTitle">
+    <div class="chatHead">
+      <strong id="chatWorkspaceTitle">Local AI Chat</strong>
+      <span>Connect a model, then ask a coding question.</span>
+    </div>
+    <main class="chat" id="chat">
+    <div class="msg system"><span class="who">TGAIC</span>Connect to a local model server, then start coding. Conversation history stays in this page until you click New Chat or reload.</div>
+  </main>
+    <section class="composer">
+    <label for="prompt">Message</label>
+    <textarea id="prompt" placeholder="Ask the local coding model something…"></textarea>
+    <div class="actions">
+      <div class="leftActions">
+        <button id="clearDisplayBtn" type="button">Clear Display</button>
+        <button id="copyLastBtn" type="button">Copy Last Response</button>
+      </div>
+      <div class="rightActions">
+        <button id="stopBtn" type="button" disabled>Stop</button>
+        <button class="primary" id="sendBtn" type="button" disabled>Send</button>
+      </div>
+    </div>
+    <div class="note">Enter sends. Shift+Enter inserts a new line. Run the <b>downloaded local HTML file</b> for normal bridge access. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
+  </section>
+  </section>
+
+
+<details class="modelManager">
       <summary>Local Model Manager — llama.cpp router mode</summary>
       <div class="modelManagerBody">
         <div class="note">When llama-server is started in <b>router mode</b> (no <code>-m</code> or <code>-hf</code> model on the startup command), TGAIC can ask llama.cpp for the models available in its local cache/model directory, show their size/status, and load or unload one without restarting TGAIC.</div>
@@ -256,7 +313,7 @@ footer{
     </details>
 
 
-    <details class="hfBrowser" open>
+    <details class="hfBrowser">
       <summary>Hugging Face Model Browser — discover GGUF models online</summary>
       <div class="hfBrowserBody">
         <div class="note">Searches Hugging Face model candidates through the TGAIC bridge and displays repositories containing <b>GGUF</b> files. Results are paginated; <b>Results per page</b> defaults to 10. The bridge keeps following Hugging Face search pages internally until it has collected that many matching GGUF repositories. When a specific quantization is selected, each repository contributes at most one displayed row, or Hugging Face reports that there are no more results. Changing search text, quantization, size, model type, Hugging Face sort, token, or results-per-page does not contact Hugging Face automatically; click <b>Search Models</b> when you are ready to run a new search. The sort choices shown here are supported by the Hugging Face models API and therefore control the global Hub traversal order; TGAIC does not locally re-sort individual pages. Use <b>Previous</b> and <b>Next</b> to move through the resulting TGAIC pages. You may optionally enter an <b>HF Token</b> for authenticated API access; the token is sent only to the local bridge for the current request and is not stored by TGAIC. The bridge prefilters search metadata for GGUF candidates before making repo-tree calls, shows available quantizations and actual GGUF file sizes when reported, and generates a copy-ready <code>llama-server -hf ...</code> command. This panel does <b>not</b> download or start models.</div>
@@ -267,8 +324,9 @@ footer{
           </div>
           <div>
             <label for="hfToken">HF Token (optional)</label>
-            <input id="hfToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_...">
-            <div class="tiny">Sent only to the local TGAIC bridge for Hugging Face requests. Not saved by TGAIC.</div>
+            <input id="hfToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_..."
+              title="Optional Hugging Face token. Sent only to the local TGAIC bridge for Hugging Face requests and not saved by TGAIC.">
+            <div class="tiny" title="Sent only to the local TGAIC bridge for Hugging Face requests. Not saved by TGAIC.">Local request only · not saved</div>
           </div>
           <div>
             <label for="hfLimit">Results per page</label>
@@ -301,12 +359,12 @@ footer{
           </div>
           <div>
             <label for="hfTypeFilter">Model type</label>
-            <select id="hfTypeFilter">
+            <select id="hfTypeFilter" title="Text-only is recommended for the current TGAIC chat UI.">
               <option value="text" selected>Text GGUF only</option>
               <option value="">All GGUF types</option>
               <option value="multimodal">Multimodal / mmproj</option>
             </select>
-            <div class="tiny">Text-only is recommended for the current TGAIC chat UI.</div>
+            <div class="tiny" title="Text-only is recommended for the current TGAIC chat UI.">Recommended: text-only</div>
           </div>
           <div>
             <label for="hfSort">Hugging Face sort</label>
@@ -339,9 +397,24 @@ footer{
       </div>
     </details>
 
-    <details class="setupBox">
-      <summary>Local setup — complete Windows installation and startup guide</summary>
-      <div class="setupBody">
+  </section>
+
+
+  <footer class="app-footer" title="TGAIC AI Coder — The Greco AI Coder">
+    <span>© <span id="year"></span> <strong>mikejamesgreco.me LLC</strong>. All rights reserved. <span id="version"></span><span class="footer-sep">|</span><a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer" title="Open the TGAIC repository and README on GitHub">GitHub / README ↗</a></span>
+  </footer>
+</div>
+
+
+<div id="helpBack" class="modalback" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="helpModal">
+    <div class="helpHead">
+      <strong id="helpTitle">TGAIC Help — Local Setup</strong>
+      <span class="spacer"></span>
+      <button id="closeHelpTop" type="button">Close</button>
+    </div>
+    <div class="helpScroll">
+
         <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0025.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
         <p class="note"><b>Run the downloaded HTML locally:</b> the GitHub Pages copy is not the normal TGAIC runtime. Because GitHub Pages is HTTPS and the TGAIC bridge is normally plain HTTP on <code>127.0.0.1:8787</code>, modern browser mixed-content/private-network rules may block the hosted page from reaching the bridge. Download <code>tgaic-ai-coder.html</code>, then double-click the local file.</p>
         <p><b>Architecture.</b> TGAIC uses a <b>single-file browser UI</b>, but the complete local runtime also requires the PowerShell bridge and llama.cpp. TGAIC is therefore local-first and dependency-light, but unlike TGG Grid it is not a browser-only Single-File Local Application. TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
@@ -538,46 +611,23 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-
 
         <div class="setupSection">
           <h3>25. Repository and project documentation</h3>
-          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0023.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0024.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
           <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
-      </div>
-</details>
-  </section>
-
-  <main class="chat" id="chat">
-    <div class="msg system"><span class="who">TGAIC</span>Connect to a local model server, then start coding. Conversation history stays in this page until you click New Chat or reload.</div>
-  </main>
-
-  <section class="card composer">
-    <label for="prompt">Message</label>
-    <textarea id="prompt" placeholder="Ask the local coding model something…"></textarea>
-    <div class="actions">
-      <div class="leftActions">
-        <button id="clearDisplayBtn" type="button">Clear Display</button>
-        <button id="copyLastBtn" type="button">Copy Last Response</button>
-      </div>
-      <div class="rightActions">
-        <button id="stopBtn" type="button" disabled>Stop</button>
-        <button class="primary" id="sendBtn" type="button" disabled>Send</button>
-      </div>
+      
     </div>
-    <div class="note">Enter sends. Shift+Enter inserts a new line. Run the <b>downloaded local HTML file</b> for normal bridge access. This <span id="helpVersion"></span> includes a local llama.cpp model manager, Hugging Face GGUF discovery/compatibility hints, and safe Markdown rendering. General web browsing/search, reference-file/RAG workspace, image generation, and alternate inference runtimes are not currently included.</div>
-  </section>
-
-  <footer class="app-footer" title="TGAIC AI Coder — The Greco AI Coder">
-    <span>© <span id="year"></span> <strong>mikejamesgreco.me LLC</strong>. All rights reserved. <span id="version"></span><span class="footer-sep">|</span><a href="https://github.com/mikejamesgreco/tgaic-ai-coder#readme" target="_blank" rel="noopener noreferrer" title="Open the TGAIC repository and README on GitHub">GitHub / README ↗</a></span>
-  </footer>
+    <div class="helpActions"><button id="closeHelp" class="primary" type="button">Close</button></div>
+  </div>
 </div>
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0023';
+const APP_VERSION='v0024';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
   chat:$('chat'),prompt:$('prompt'),send:$('sendBtn'),stop:$('stopBtn'),
-  newChat:$('newChatBtn'),clearDisplay:$('clearDisplayBtn'),copyLast:$('copyLastBtn'),
+  newChat:$('newChatBtn'),help:$('helpBtn'),clearDisplay:$('clearDisplayBtn'),copyLast:$('copyLastBtn'),
   availableModel:$('availableModelSelect'),refreshModels:$('refreshModelsBtn'),loadModel:$('loadModelBtn'),unloadModel:$('unloadModelBtn'),modelTable:$('modelTableBody'),modelManagerStatus:$('modelManagerStatus'),
   hfSearch:$('hfSearch'),hfToken:$('hfToken'),hfLimit:$('hfLimit'),hfQuant:$('hfQuantFilter'),hfSize:$('hfSizeFilter'),hfType:$('hfTypeFilter'),hfSort:$('hfSort'),hfSearchBtn:$('hfSearchBtn'),hfTable:$('hfTableBody'),hfStatus:$('hfStatus'),hfCopyCache:$('hfCopyCacheBtn'),hfPrev:$('hfPrevBtn'),hfNext:$('hfNextBtn'),hfPageLabel:$('hfPageLabel')
 };
@@ -1276,6 +1326,12 @@ ui.chat.addEventListener('click',async e=>{
     ta.remove();
   }
 });
+
+ui.help.addEventListener('click',()=>{$('helpBack').classList.add('open');});
+$('closeHelp').addEventListener('click',()=>{$('helpBack').classList.remove('open');});
+$('closeHelpTop').addEventListener('click',()=>{$('helpBack').classList.remove('open');});
+$('helpBack').addEventListener('click',e=>{if(e.target===$('helpBack'))$('helpBack').classList.remove('open');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('helpBack').classList.remove('open');});
 
 ui.hfSearchBtn.addEventListener('click',searchHuggingFace);
 ui.hfSearch.addEventListener('input',markHfSearchCriteriaChanged);
