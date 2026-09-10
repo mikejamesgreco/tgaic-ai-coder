@@ -86,7 +86,7 @@ Open a second Command Prompt in the repository folder.
 
 Run:
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 Expected bridge endpoint:
 
@@ -130,7 +130,7 @@ llama-server --host 127.0.0.1 --port 8080 -c 8192
 
 Window 2 - TGAIC bridge:
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 Browser:
 
@@ -164,7 +164,7 @@ Ctrl+C
 
 Then start it again:
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 
 10. RESTART LLAMA-SERVER
@@ -238,7 +238,7 @@ Use this for direct/manual model startup rather than router mode.
 Set a Hugging Face token for the bridge process:
 
 set HF_TOKEN=hf_your_token_here
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 Alternative:
 Enter the token directly in the TGAIC HF Token field.
@@ -290,7 +290,7 @@ Main local UI:
 tgaic-ai-coder.html
 
 Current bridge:
-tgaic-ai-coder-bridge-v0025.ps1
+tgaic-ai-coder-bridge-v0030.ps1
 
 Typical model cache:
 C:\Models
@@ -371,7 +371,7 @@ llama-server --host 127.0.0.1 --port 8080 -c 8192
 
 Start bridge:
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 Open:
 
@@ -401,7 +401,7 @@ llama-server --host 127.0.0.1 --port 8080 -c 8192
 
 Restart bridge:
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0025.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
 
 Return to TGAIC:
 
@@ -438,3 +438,245 @@ END
 ===
 For concepts and terminology, use the References button in TGAIC.
 For the complete setup guide, use the Help button in TGAIC or README.md.
+
+
+21. LOCAL RAG QUICK START
+=========================
+
+TGAIC v0033 + bridge v0030 include bridge-managed, token-aware local RAG.
+
+Start llama-server in router mode:
+
+set LLAMA_CACHE=C:\Models
+llama-server --host 127.0.0.1 --port 8080 -c 8192
+
+Start the bridge:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1
+
+Open the downloaded local HTML, connect, and load the desired coding model.
+
+Then:
+  1. Expand "Local Knowledge / RAG".
+  2. Click Add Files or Add Folder.
+  3. Confirm the desired model is selected.
+  4. Click Build / Rebuild Index.
+  5. Leave "Enable RAG for chat" checked.
+  6. Ask questions normally.
+
+Default settings:
+  Chunk target        800 tokens
+  Chunk overlap       150 tokens
+  RAG budget         4000 tokens/question
+  Maximum chunks        8
+
+
+22. WHAT RAG DOES
+=================
+
+RAG = Retrieval-Augmented Generation.
+
+It does NOT retrain the GGUF model. It retrieves relevant reference chunks and
+adds them temporarily to the prompt for the current question.
+
+INDEXING:
+
+local files
+   |
+   v
+TGAIC browser
+   |
+   v
+PowerShell bridge
+   |
+   +--> llama-server /tokenize using selected model
+   |
+   v
+overlapping token-sized chunks
+   |
+   v
+%LOCALAPPDATA%\TGAIC\rag-index.json
+
+QUESTION:
+
+question
+   |
+   v
+bridge lexical/code-aware retrieval
+   |
+   v
+best matching chunks within token budget
+   |
+   v
+TGAIC prompt + filename/line provenance
+   |
+   v
+coding model inference
+   |
+   v
+grounded answer
+
+
+23. TOKENIZATION VS EMBEDDINGS
+==============================
+
+TOKENIZATION
+------------
+Text -> discrete token IDs / token pieces.
+
+TGAIC currently calls llama-server /tokenize using the selected model. This is
+important because different model families can tokenize the same text
+differently. Using the real tokenizer makes the 800-token chunk target,
+150-token overlap, and 4000-token RAG budget meaningful to that model.
+
+In llama-server router mode, /tokenize must receive the model name. TGAIC sends
+the currently selected model automatically.
+
+EMBEDDINGS
+----------
+Text -> semantic numerical vector.
+
+Embedding RAG normally does this:
+
+reference chunk -> embedding model -> vector
+question        -> same embedding model -> query vector
+vectors         -> similarity search -> nearest chunks -> coding model
+
+Tokenization and embeddings are NOT the same thing.
+
+Current TGAIC:
+  model-aware tokenization + lexical/code-aware retrieval
+
+Possible future TGAIC:
+  lexical retrieval + embedding similarity + optional reranker
+
+llama-server supports /v1/embeddings when an appropriate embedding model is
+loaded. TGAIC does not currently build/store embedding vectors.
+
+
+24. CURRENT RETRIEVAL METHOD
+============================
+
+The bridge currently performs lexical/code-aware retrieval. It favors useful
+coding signals such as:
+  - exact identifiers
+  - class/package/procedure names
+  - table/column names
+  - filenames
+  - repeated query terms
+  - exact phrase/text matches
+
+This is often effective for source-code RAG because engineering questions
+frequently contain the exact names present in the source.
+
+Retrieved chunks carry filename and approximate line-range provenance.
+
+
+25. RERANKING / HYBRID RAG
+==========================
+
+A more advanced pipeline can retrieve candidates quickly and then use a
+dedicated reranker model to reorder them:
+
+question
+   +--> lexical search ----+
+   +--> embedding search --+--> candidates --> reranker --> coder model
+
+llama-server exposes reranking support with an appropriate reranker model.
+TGAIC does not currently use a reranker.
+
+
+26. WHEN TO REBUILD THE RAG INDEX
+=================================
+
+REBUILD when:
+  - a reference file changed
+  - adding/removing reference files
+  - chunk target or overlap changed
+  - switching to a materially different model/tokenizer and you want exact
+    model-specific chunk boundaries/token counts
+  - intentionally replacing the knowledge set
+
+NO REBUILD needed merely because:
+  - the HTML page was closed/reopened
+  - the bridge was restarted and successfully reloaded the persisted index
+
+The bridge persists the index at:
+  %LOCALAPPDATA%\TGAIC\rag-index.json
+
+The UI shows:
+  STAGED  = newly selected in the current browser session
+  INDEXED = persisted in the bridge-managed RAG index
+
+
+27. RAG CONTEXT BUDGET
+======================
+
+RAG evidence shares the model's finite context window with:
+  - system instructions
+  - conversation history
+  - current user question
+  - generated answer
+
+A 4000-token RAG budget is a maximum, not a target. TGAIC can retrieve fewer
+tokens/chunks when fewer are relevant.
+
+If llama-server is started with:
+  -c 8192
+
+then 8192 is the configured runtime context size. Do not assume all 8192 tokens
+are available for RAG alone.
+
+
+28. LOCALITY / PRIVACY
+======================
+
+RAG reference files and the generated index remain local to the TGAIC workflow.
+They are not sent to Hugging Face.
+
+Hugging Face traffic is limited to explicit Model Browser activity.
+
+Clear Index removes the bridge's persisted local RAG index.
+
+
+29. RAG TROUBLESHOOTING
+=======================
+
+"model name is missing from the request"
+  Router-mode llama-server needs a model identifier on /tokenize.
+  Use TGAIC v0033 + bridge v0030 together and select/load a model first.
+
+Persisted list empty after reopening
+  Confirm bridge v0030 is running. The bridge returns an indexed-file manifest
+  through /rag/status and TGAIC repopulates INDEXED references from it.
+
+"undefined · 0 chunks · 0 indexed tok"
+  This was caused by an older nested-array manifest response. Bridge v0030
+  removes the extra wrapper and TGAIC v0033 defensively flattens the response.
+
+RAG enabled but no chunks retrieved
+  The current question did not score strongly enough against the lexical/code
+  index. Try exact class, method, table, package, filename, or identifier names.
+
+
+30. OFFICIAL LLAMA.CPP RAG-RELATED ENDPOINTS
+===========================================
+
+llama-server documentation:
+https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+
+Relevant capabilities:
+  POST /tokenize
+      Tokenizes text with the target model. Used by current TGAIC RAG.
+
+  POST /v1/embeddings
+      Produces embedding vectors with an embedding-capable model.
+      Candidate for future semantic TGAIC RAG.
+
+  POST /rerank  (aliases include /v1/rerank)
+      Reranks candidate documents with a suitable reranker model.
+      Candidate for future hybrid TGAIC RAG.
+
+
+END
+===

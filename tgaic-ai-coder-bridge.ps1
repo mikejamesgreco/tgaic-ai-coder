@@ -528,6 +528,502 @@ function Invoke-HuggingFaceModelSearch {
     data = $results.ToArray()
   }
 }
+
+# ---------------------------------------------------------------------------
+# Local RAG / Reference Index
+# ---------------------------------------------------------------------------
+# Design boundary:
+#   - llama-server owns tokenization via POST /tokenize.
+#   - this bridge owns file ingestion, token-sized chunk coordination,
+#     metadata, retrieval, and local persistence.
+#   - the chat model still owns answer generation.
+#
+# The index is intentionally stored outside the Git repository so source-code
+# reference material is not accidentally committed with the project.
+$RagStoreRoot = if ($env:LOCALAPPDATA) {
+  Join-Path $env:LOCALAPPDATA "TGAIC"
+} else {
+  Join-Path $PSScriptRoot ".tgaic-local"
+}
+$RagStorePath = Join-Path $RagStoreRoot "rag-index.json"
+
+$script:RagIndex = @()
+$script:RagMeta = @{
+  indexVersion = 1
+  createdAt = $null
+  fileCount = 0
+  chunkCount = 0
+  totalTokens = 0
+  chunkTargetTokens = 800
+  chunkOverlapTokens = 150
+  tokenizer = "llama-server /tokenize"
+  persistencePath = $RagStorePath
+}
+
+function Read-JsonBody {
+  param($Request, [int64]$MaxBytes = 52428800)
+
+  if ($Request.ContentLength64 -gt $MaxBytes) {
+    throw "Request body is larger than the allowed $MaxBytes bytes."
+  }
+
+  $reader = [IO.StreamReader]::new($Request.InputStream, $Request.ContentEncoding)
+  try {
+    $body = $reader.ReadToEnd()
+  }
+  finally {
+    $reader.Dispose()
+  }
+
+  if (-not $body -or $body.Trim().Length -eq 0) {
+    return $null
+  }
+
+  return ConvertFrom-Json -InputObject $body
+}
+
+function Invoke-LlamaTokenize {
+  param(
+    [Parameter(Mandatory=$true)][string]$Content,
+    [Parameter(Mandatory=$true)][string]$Model,
+    [bool]$WithPieces = $false
+  )
+
+  if (-not $Model -or -not $Model.Trim()) {
+    throw "A model name is required for llama-server router-mode tokenization."
+  }
+
+  $payload = @{
+    model = $Model
+    content = $Content
+    add_special = $false
+    parse_special = $true
+    with_pieces = $WithPieces
+  } | ConvertTo-Json -Compress
+
+  $target = $UpstreamRoot.TrimEnd("/") + "/tokenize"
+  $message = [System.Net.Http.HttpRequestMessage]::new(
+    [System.Net.Http.HttpMethod]::Post,
+    $target
+  )
+  $message.Content = [System.Net.Http.StringContent]::new(
+    $payload,
+    [Text.Encoding]::UTF8,
+    "application/json"
+  )
+
+  try {
+    $resp = $client.SendAsync($message).GetAwaiter().GetResult()
+    $text = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+    if (-not $resp.IsSuccessStatusCode) {
+      throw "llama-server /tokenize returned HTTP $([int]$resp.StatusCode): $(Get-TextPreview $text)"
+    }
+
+    return ConvertFrom-Json -InputObject $text
+  }
+  finally {
+    if ($resp) { $resp.Dispose() }
+    $message.Dispose()
+  }
+}
+
+function Convert-TokenPieceToText {
+  param($Piece)
+
+  if ($null -eq $Piece) { return "" }
+  if ($Piece -is [string]) { return [string]$Piece }
+
+  # llama-server returns raw byte arrays when one token piece is not itself
+  # valid Unicode. Convert those bytes locally. Most ordinary source-code
+  # pieces arrive as strings.
+  try {
+    $bytes = New-Object System.Collections.Generic.List[byte]
+    foreach ($v in $Piece) {
+      $bytes.Add([byte]$v)
+    }
+    return [Text.Encoding]::UTF8.GetString($bytes.ToArray())
+  }
+  catch {
+    return [string]$Piece
+  }
+}
+
+function Save-RagIndex {
+  try {
+    if (-not (Test-Path $RagStoreRoot)) {
+      New-Item -ItemType Directory -Path $RagStoreRoot -Force | Out-Null
+    }
+
+    $doc = @{
+      meta = $script:RagMeta
+      chunks = @($script:RagIndex)
+    }
+
+    $json = $doc | ConvertTo-Json -Depth 8
+    [IO.File]::WriteAllText($RagStorePath, $json, (New-Object Text.UTF8Encoding($false)))
+    return $true
+  }
+  catch {
+    Write-Warning "Could not persist TGAIC RAG index: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+function Load-RagIndex {
+  if (-not (Test-Path $RagStorePath)) { return }
+
+  try {
+    $raw = [IO.File]::ReadAllText($RagStorePath, [Text.Encoding]::UTF8)
+    if (-not $raw) { return }
+
+    $doc = ConvertFrom-Json -InputObject $raw
+    if ($doc.meta) {
+      foreach ($p in $doc.meta.PSObject.Properties) {
+        $script:RagMeta[$p.Name] = $p.Value
+      }
+    }
+
+    $loaded = New-Object System.Collections.Generic.List[object]
+    foreach ($c in @($doc.chunks)) { $loaded.Add($c) }
+    $script:RagIndex = $loaded.ToArray()
+
+    Write-Host "RAG Index : loaded $($script:RagIndex.Count) chunk(s) from $RagStorePath"
+  }
+  catch {
+    Write-Warning "Could not load existing TGAIC RAG index: $($_.Exception.Message)"
+  }
+}
+
+function Clear-RagIndex {
+  $script:RagIndex = @()
+  $script:RagMeta = @{
+    indexVersion = 1
+    createdAt = $null
+    fileCount = 0
+    chunkCount = 0
+    totalTokens = 0
+    chunkTargetTokens = 800
+    chunkOverlapTokens = 150
+    tokenizer = "llama-server /tokenize"
+    persistencePath = $RagStorePath
+  }
+
+  try {
+    if (Test-Path $RagStorePath) {
+      Remove-Item -Path $RagStorePath -Force
+    }
+  } catch {}
+
+  return $script:RagMeta
+}
+
+function Build-RagIndex {
+  param($Payload)
+
+  if (-not $Payload -or -not $Payload.files) {
+    throw "RAG index request must contain a files array."
+  }
+
+  $model = [string]$Payload.model
+  if (-not $model -or -not $model.Trim()) {
+    throw "RAG index build requires the selected llama-server model name."
+  }
+
+  $targetTokens = 800
+  $overlapTokens = 150
+
+  if ($Payload.chunkTargetTokens) { $targetTokens = [int]$Payload.chunkTargetTokens }
+  if ($Payload.chunkOverlapTokens -ne $null) { $overlapTokens = [int]$Payload.chunkOverlapTokens }
+
+  if ($targetTokens -lt 128) { $targetTokens = 128 }
+  if ($targetTokens -gt 4096) { $targetTokens = 4096 }
+  if ($overlapTokens -lt 0) { $overlapTokens = 0 }
+  if ($overlapTokens -ge $targetTokens) {
+    $overlapTokens = [Math]::Max(0, [int]($targetTokens / 4))
+  }
+
+  $files = @($Payload.files)
+  if ($files.Count -gt 200) {
+    throw "A maximum of 200 reference files can be indexed in one request."
+  }
+
+  $chunks = New-Object System.Collections.Generic.List[object]
+  $fileCount = 0
+  $totalTokens = 0
+  $chunkId = 0
+
+  foreach ($file in $files) {
+    $name = [string]$file.name
+    $text = [string]$file.text
+
+    if (-not $name) { $name = "reference-$($fileCount + 1).txt" }
+    if ($null -eq $text -or $text.Length -eq 0) { continue }
+    if ($text.Length -gt 15000000) {
+      throw "Reference file '$name' is larger than the 15,000,000 character per-file safety limit."
+    }
+
+    Write-Host "[RAG] Tokenizing $name ($($text.Length) chars)..."
+    $tokenized = Invoke-LlamaTokenize -Content $text -Model $model -WithPieces $true
+    $tokens = @($tokenized.tokens)
+
+    if ($tokens.Count -eq 0) { continue }
+
+    $pieceText = New-Object string[] $tokens.Count
+    $linePrefix = New-Object int[] ($tokens.Count + 1)
+    $linePrefix[0] = 0
+
+    for ($i = 0; $i -lt $tokens.Count; $i++) {
+      $piece = $tokens[$i].piece
+      $s = Convert-TokenPieceToText $piece
+      $pieceText[$i] = $s
+      $linePrefix[$i + 1] = $linePrefix[$i] + ([regex]::Matches($s, "`n")).Count
+    }
+
+    $step = $targetTokens - $overlapTokens
+    if ($step -lt 1) { $step = $targetTokens }
+
+    for ($start = 0; $start -lt $tokens.Count; $start += $step) {
+      $end = [Math]::Min($tokens.Count, $start + $targetTokens)
+      $sb = New-Object Text.StringBuilder
+      for ($j = $start; $j -lt $end; $j++) {
+        [void]$sb.Append($pieceText[$j])
+      }
+
+      $chunkText = $sb.ToString()
+      if (-not $chunkText -or $chunkText.Trim().Length -eq 0) {
+        if ($end -ge $tokens.Count) { break }
+        continue
+      }
+
+      $startLine = $linePrefix[$start] + 1
+      $endLine = $linePrefix[$end] + 1
+      if ($chunkText.EndsWith("`n") -and $endLine -gt $startLine) {
+        $endLine--
+      }
+
+      $chunkId++
+      $count = $end - $start
+      $totalTokens += $count
+
+      $chunks.Add([pscustomobject]@{
+        id = $chunkId
+        file = $name
+        startLine = $startLine
+        endLine = $endLine
+        tokenStart = $start
+        tokenEnd = ($end - 1)
+        tokenCount = $count
+        text = $chunkText
+      })
+
+      if ($end -ge $tokens.Count) { break }
+    }
+
+    $fileCount++
+  }
+
+  $script:RagIndex = $chunks.ToArray()
+  $script:RagMeta = @{
+    indexVersion = 1
+    createdAt = [DateTime]::UtcNow.ToString("o")
+    fileCount = $fileCount
+    chunkCount = $script:RagIndex.Count
+    totalTokens = $totalTokens
+    chunkTargetTokens = $targetTokens
+    chunkOverlapTokens = $overlapTokens
+    tokenizer = "llama-server /tokenize"
+    tokenizerModel = $model
+    persistencePath = $RagStorePath
+    indexedFiles = @(Get-RagIndexedFiles)
+  }
+
+  $persisted = Save-RagIndex
+
+  return @{
+    ok = $true
+    persisted = $persisted
+    meta = $script:RagMeta
+  }
+}
+
+function Get-RagTerms {
+  param([string]$Text)
+
+  $stop = @{
+    "the"=1;"and"=1;"that"=1;"this"=1;"with"=1;"from"=1;"into"=1;"where"=1;"what"=1;
+    "when"=1;"which"=1;"does"=1;"have"=1;"about"=1;"would"=1;"could"=1;"should"=1;
+    "there"=1;"their"=1;"then"=1;"than"=1;"also"=1;"your"=1;"you"=1;"are"=1;"for"=1;
+    "how"=1;"why"=1;"who"=1;"can"=1;"use"=1;"used"=1;"using"=1;"get"=1;"set"=1;"was"=1;
+    "were"=1;"has"=1;"had"=1;"not"=1;"but"=1;"all"=1;"any"=1;"our"=1;"out"=1
+  }
+
+  $seen = @{}
+  $terms = New-Object System.Collections.Generic.List[string]
+  foreach ($m in [regex]::Matches(($Text.ToLowerInvariant()), "[a-z_][a-z0-9_.$#-]{1,}")) {
+    $t = $m.Value
+    if ($t.Length -lt 2) { continue }
+    if ($stop.ContainsKey($t)) { continue }
+    if (-not $seen.ContainsKey($t)) {
+      $seen[$t] = $true
+      $terms.Add($t)
+    }
+  }
+  return $terms.ToArray()
+}
+
+function Search-RagIndex {
+  param($Payload)
+
+  if (-not $Payload) { throw "RAG search request body is required." }
+  $query = [string]$Payload.query
+  if (-not $query.Trim()) { throw "RAG search query is required." }
+
+  $model = [string]$Payload.model
+  if (-not $model -or -not $model.Trim()) {
+    $model = [string]$script:RagMeta.tokenizerModel
+  }
+  if (-not $model -or -not $model.Trim()) {
+    throw "RAG retrieval requires a llama-server model name."
+  }
+
+  $topK = 8
+  $budget = 4000
+  if ($Payload.topK) { $topK = [int]$Payload.topK }
+  if ($Payload.tokenBudget) { $budget = [int]$Payload.tokenBudget }
+
+  if ($topK -lt 1) { $topK = 1 }
+  if ($topK -gt 30) { $topK = 30 }
+  if ($budget -lt 128) { $budget = 128 }
+  if ($budget -gt 16000) { $budget = 16000 }
+
+  $queryTokens = Invoke-LlamaTokenize -Content $query -Model $model -WithPieces $false
+  $queryTokenCount = @($queryTokens.tokens).Count
+  $terms = @(Get-RagTerms $query)
+
+  $scored = New-Object System.Collections.Generic.List[object]
+  $queryLower = $query.ToLowerInvariant().Trim()
+
+  foreach ($c in @($script:RagIndex)) {
+    $textLower = ([string]$c.text).ToLowerInvariant()
+    $fileLower = ([string]$c.file).ToLowerInvariant()
+    $score = 0.0
+    $matched = New-Object System.Collections.Generic.List[string]
+
+    foreach ($term in $terms) {
+      $termEsc = [regex]::Escape($term)
+      $occ = ([regex]::Matches($textLower, $termEsc)).Count
+      $fileOcc = ([regex]::Matches($fileLower, $termEsc)).Count
+
+      if ($occ -gt 0 -or $fileOcc -gt 0) {
+        $matched.Add($term)
+        # Exact identifier-like matches are intentionally strong for code RAG.
+        $identifierBonus = if ($term.Contains("_") -or $term.Contains(".") -or $term.Contains("$")) { 8.0 } else { 2.0 }
+        $score += ($occ * 1.5) + ($fileOcc * 8.0) + $identifierBonus
+      }
+    }
+
+    if ($queryLower.Length -ge 8 -and $textLower.Contains($queryLower)) {
+      $score += 30.0
+    }
+
+    if ($score -gt 0) {
+      $scored.Add([pscustomobject]@{
+        chunk = $c
+        score = [Math]::Round($score, 3)
+        matchedTerms = $matched.ToArray()
+      })
+    }
+  }
+
+  $ordered = @($scored | Sort-Object @{Expression="score";Descending=$true}, @{Expression={$_.chunk.file};Descending=$false}, @{Expression={$_.chunk.startLine};Descending=$false})
+
+  $picked = New-Object System.Collections.Generic.List[object]
+  $used = 0
+
+  foreach ($s in $ordered) {
+    if ($picked.Count -ge $topK) { break }
+    $count = [int]$s.chunk.tokenCount
+
+    if ($picked.Count -gt 0 -and ($used + $count) -gt $budget) { continue }
+
+    # If the best chunk alone is larger than a very small requested budget,
+    # return it anyway: chunks are already bounded by the configured target.
+    $picked.Add([pscustomobject]@{
+      id = $s.chunk.id
+      file = $s.chunk.file
+      startLine = $s.chunk.startLine
+      endLine = $s.chunk.endLine
+      tokenCount = $count
+      score = $s.score
+      matchedTerms = $s.matchedTerms
+      text = $s.chunk.text
+    })
+    $used += $count
+
+    if ($used -ge $budget) { break }
+  }
+
+  return @{
+    ok = $true
+    retrievalMethod = "token-aware lexical code retrieval"
+    queryTokenCount = $queryTokenCount
+    queryTerms = $terms
+    tokenBudget = $budget
+    tokensSelected = $used
+    count = $picked.Count
+    chunks = $picked.ToArray()
+    indexMeta = $script:RagMeta
+  }
+}
+
+function Get-RagIndexedFiles {
+  $byFile = @{}
+
+  foreach ($c in @($script:RagIndex)) {
+    $name = [string]$c.file
+    if (-not $name) { continue }
+
+    if (-not $byFile.ContainsKey($name)) {
+      $byFile[$name] = @{
+        name = $name
+        chunkCount = 0
+        indexedTokens = 0
+      }
+    }
+
+    $byFile[$name].chunkCount = [int]$byFile[$name].chunkCount + 1
+    $byFile[$name].indexedTokens = [int]$byFile[$name].indexedTokens + [int]$c.tokenCount
+  }
+
+  $files = @()
+  foreach ($name in @($byFile.Keys | Sort-Object)) {
+    $x = $byFile[$name]
+    $files += [pscustomobject]@{
+      name = [string]$x.name
+      chunkCount = [int]$x.chunkCount
+      indexedTokens = [int]$x.indexedTokens
+    }
+  }
+
+  return $files
+}
+
+function Get-RagStatus {
+  $files = @(Get-RagIndexedFiles)
+
+  return @{
+    ok = $true
+    meta = $script:RagMeta
+    active = ($script:RagIndex.Count -gt 0)
+    persistencePath = $RagStorePath
+    indexedFiles = @($files)
+    indexedFileNames = @($files | ForEach-Object { $_.name })
+  }
+}
+
+Load-RagIndex
+
 $prefix = "http://${ListenHost}:${ListenPort}/"
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add($prefix)
@@ -545,6 +1041,7 @@ Write-Host "Upstream  : $UpstreamBase"
 Write-Host "HF Search : $HuggingFaceBase/api/models"
 Write-Host "HF Debug  : $HfDebug"
 Write-Host "HF Token  : $(if ($HfToken -and $HfToken.Trim().Length -gt 0) { 'Environment token configured' } else { 'No environment token (HTML token supported)' })"
+Write-Host "RAG Store : $RagStorePath"
 Write-Host "Mode      : API bridge only (open the TGAIC HTML file directly)"
 Write-Host "Press Ctrl+C to stop."
 Write-Host ""
@@ -571,7 +1068,7 @@ try {
           ok = $true
           bridge = "TGAIC AI Coder Bridge"
           mode = "api-proxy"
-          message = "Open the TGAIC HTML directly; use /health, /v1/*, /models*, or /hf/models for API access."
+          message = "Open the TGAIC HTML directly; use /health, /v1/*, /models*, /rag/*, or /hf/models for API access."
           upstream = $UpstreamBase
           huggingFace = "$HuggingFaceBase/api/models"
         }
@@ -596,6 +1093,54 @@ try {
           mode = "api-proxy"
           cors = "allow-all"
           upstream = $UpstreamBase
+        }
+        continue
+      }
+
+
+      if ($path -eq "/rag/status" -and $req.HttpMethod -eq "GET") {
+        Write-Json $res (Get-RagStatus)
+        continue
+      }
+
+      if ($path -eq "/rag/index" -and $req.HttpMethod -eq "POST") {
+        try {
+          $payload = Read-JsonBody $req
+          $result = Build-RagIndex $payload
+          Write-Json $res $result
+        }
+        catch {
+          Write-Json $res @{
+            ok = $false
+            error = $_.Exception.Message
+            message = "RAG index build failed. Confirm a model is loaded in llama-server so /tokenize is available."
+          } 400
+        }
+        continue
+      }
+
+      if ($path -eq "/rag/search" -and $req.HttpMethod -eq "POST") {
+        try {
+          $payload = Read-JsonBody $req 1048576
+          $result = Search-RagIndex $payload
+          Write-Json $res $result
+        }
+        catch {
+          Write-Json $res @{
+            ok = $false
+            error = $_.Exception.Message
+            message = "RAG retrieval failed."
+          } 400
+        }
+        continue
+      }
+
+      if ($path -eq "/rag/clear" -and $req.HttpMethod -eq "POST") {
+        $meta = Clear-RagIndex
+        Write-Json $res @{
+          ok = $true
+          meta = $meta
+          message = "RAG index cleared."
         }
         continue
       }
@@ -627,7 +1172,7 @@ try {
         $target = $UpstreamRoot.TrimEnd("/") + $path + $req.Url.Query
       }
       else {
-        Write-Json $res @{ error = "Use /health, /v1/*, /models*, or /hf/models" } 404
+        Write-Json $res @{ error = "Use /health, /v1/*, /models*, /rag/*, or /hf/models" } 404
         continue
       }
 
