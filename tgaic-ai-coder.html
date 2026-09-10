@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TGAIC AI Coder v0033</title>
+<title>TGAIC AI Coder v0034</title>
 <meta name="description" content="A simple local-first browser chat client for serious local coding work against a localhost OpenAI-compatible model server.">
 <style>
 *{box-sizing:border-box}
@@ -231,7 +231,7 @@ footer{
 .chatSection .composer{border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
 
 
-/* v0033 local token-aware RAG */
+/* v0034 local token-aware RAG */
 .ragPanel{border-top:1px solid var(--line);background:#fbfcfe}
 .ragPanel summary{padding:11px 14px;cursor:pointer;font-size:12px;font-weight:800;color:#334155}
 .ragBody{padding:0 14px 14px}
@@ -248,6 +248,15 @@ footer{
 .ragToggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#334155}
 .ragToggle input{margin:0}
 @media(max-width:900px){.ragGrid{grid-template-columns:1fr 1fr}.ragStats{grid-template-columns:1fr 1fr}}
+
+
+    .ragUsed{margin-top:10px;border:1px solid #d8dee9;border-radius:10px;background:#fff;overflow:hidden;font-size:12px}
+    .ragUsed summary{cursor:pointer;padding:9px 11px;font-weight:800;background:#f7f9fc;user-select:none}
+    .ragUsedMeta{padding:8px 11px;border-top:1px solid #e8edf4;color:#526074;line-height:1.45}
+    .ragChunk{border-top:1px solid #e8edf4}
+    .ragChunk summary{background:#fff;padding:8px 11px;font-weight:700}
+    .ragChunk pre{margin:0;padding:10px 12px;overflow:auto;max-height:320px;white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e5e7eb;font:12px/1.45 Consolas,"Courier New",monospace}
+    .ragReasons{padding:0 11px 8px;color:#64748b;font-size:11px}
 
 </style>
 </head>
@@ -712,8 +721,19 @@ question ─────────► same embedding model ──► query vec
         <p>For example, with an 8192-token context, a 4000-token RAG budget is a ceiling for retrieved evidence, not a promise that every request should consume 4000 RAG tokens. TGAIC retrieves fewer chunks when fewer are relevant.</p>
       </div>
 
+      
       <div class="setupSection">
-        <h3>14. GPU VRAM, system RAM, model size, and offload</h3>
+        <h3>14. Retrieval diagnostics and source transparency</h3>
+        <p>TGAIC exposes the exact chunks used for a RAG-assisted answer. The expandable <b>RAG Sources Used</b> panel shows filename, approximate line range, token count, retrieval score, selection reasons, and the actual chunk text supplied to the coding model.</p>
+        <p>This separates <b>retrieval quality</b> from <b>generation quality</b>: a bad answer can be diagnosed by checking whether the right evidence was retrieved first.</p>
+      </div>
+      <div class="setupSection">
+        <h3>15. Exact-file and code-aware lexical ranking</h3>
+        <p>Current retrieval first gives a strong boost to an exact indexed filename named in the question. It then ranks chunks using normal terms, identifiers, filenames, exact text, and generic code-oriented structural signals such as <code>import</code>, <code>package</code>, SQL keywords, JDBC/connection types, parameters, exceptions, and declarations.</p>
+        <p>This is still lexical/token-aware RAG rather than semantic embedding RAG, but it improves precision for source-code questions without requiring another model.</p>
+      </div>
+<div class="setupSection">
+        <h3>16. GPU VRAM, system RAM, model size, and offload</h3>
         <p>A GGUF model does <b>not always need to fit completely inside GPU VRAM</b>. llama.cpp can place some model layers/work on the GPU and leave the remainder in system RAM for CPU processing.</p>
         <ul>
           <li><b>GPU VRAM:</b> fast memory attached to the GPU. More VRAM generally allows more model work to remain on the GPU.</li>
@@ -727,7 +747,7 @@ question ─────────► same embedding model ──► query vec
       </div>
 
       <div class="setupSection">
-        <h3>15. Additional terminology</h3>
+        <h3>17. Additional terminology</h3>
         <p><b>LLM:</b> Large Language Model — a neural network trained to model and generate sequences of tokens.</p>
         <p><b>Parameters:</b> learned numerical values inside a model. Names such as 3B, 7B, or 14B roughly indicate billions of parameters.</p>
         <p><b>Weights:</b> the learned parameter values stored in the model.</p>
@@ -743,7 +763,7 @@ question ─────────► same embedding model ──► query vec
       </div>
 
       <div class="setupSection">
-        <h3>16. Official references and further reading</h3>
+        <h3>18. Official references and further reading</h3>
         <ul>
           <li><a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener noreferrer">llama.cpp project ↗</a> — official inference-runtime repository.</li>
           <li><a href="https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md" target="_blank" rel="noopener noreferrer">llama-server documentation ↗</a> — server operation, HTTP endpoints, model loading, and runtime options.</li>
@@ -775,7 +795,7 @@ question ─────────► same embedding model ──► query vec
     </div>
     <div class="helpScroll">
 
-        <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0030.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
+        <p class="note"><b>Current companion bridge:</b> <code>tgaic-ai-coder-bridge-v0031.ps1</code>. The HTML and bridge are separate files; use the current bridge when running this page.</p>
         <p class="note"><b>Run the downloaded HTML locally:</b> the GitHub Pages copy is not the normal TGAIC runtime. Because GitHub Pages is HTTPS and the TGAIC bridge is normally plain HTTP on <code>127.0.0.1:8787</code>, modern browser mixed-content/private-network rules may block the hosted page from reaching the bridge. Download <code>tgaic-ai-coder.html</code>, then double-click the local file.</p>
         <p><b>Architecture.</b> TGAIC uses a <b>single-file browser UI</b>, but the complete local runtime also requires the PowerShell bridge and llama.cpp. TGAIC is therefore local-first and dependency-light, but unlike TGG Grid it is not a browser-only Single-File Local Application. TGAIC is the HTML conversation UI. The PowerShell bridge listens on <code>127.0.0.1:8787</code> and provides the browser-safe API/CORS boundary. <code>llama-server</code> listens on <code>127.0.0.1:8080</code>, loads the GGUF model, and performs inference. Keep both console windows open while chatting.</p>
 
@@ -846,7 +866,7 @@ where llama-server</pre>
         <p><code>-hf</code> is convenient for downloading/running a Hugging Face GGUF repository; <code>-m</code> is useful when you want explicit control over a local GGUF file.</p>
 
         <p><b>4. Start the TGAIC PowerShell bridge.</b> Put the bridge PS1 somewhere convenient, open a second Command Prompt in that directory, and run:</p>
-        <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1</pre>
+        <pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0031.ps1</pre>
         <p>The bridge should report <code>Listening : http://127.0.0.1:8787/</code> and <code>Upstream : http://127.0.0.1:8080/v1</code>. Leave this second console window running.</p>
 
         <p><b>5. Download and open TGAIC locally.</b> Download or clone the repository so you have a local copy of <code>tgaic-ai-coder.html</code>, then double-click that file. TGAIC is intentionally run directly from disk as a <code>file://</code> application. Do not rely on the GitHub Pages-hosted copy for normal bridge access. The endpoint should remain:</p>
@@ -941,7 +961,7 @@ llama-server -cl</pre>
           <p><b>Option A — HTML token field:</b> enter an Hugging Face access token in the <b>HF Token</b> field in the model browser. The page sends it only to <code>http://127.0.0.1:8787</code> in the <code>X-HF-Token</code> header. The bridge converts it to a Hugging Face Bearer token. TGAIC does not save this value to localStorage, sessionStorage, cookies, or a file; reloading or closing the page clears it.</p>
           <p><b>Option B — environment variable:</b></p>
           <pre>set HF_TOKEN=hf_your_token_here
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0030.ps1</pre>
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tgaic-ai-coder-bridge-v0031.ps1</pre>
           <p>If both are present, the token entered in the HTML page takes precedence for that request. The bridge never prints the token itself.</p>
           <p><b>API efficiency:</b> the Hugging Face search response already includes model tags. The bridge first keeps only results tagged <code>gguf</code> (or clearly named as GGUF) and only then requests repository trees to discover exact GGUF filenames and sizes. This avoids a tree API call for every arbitrary model returned by the search.</p>
           <p><b>Pagination:</b> <b>Results per page</b> defaults to 10 and can be set from 1 to 100. A TGAIC page is result-oriented rather than tied one-for-one to a Hugging Face API page: the bridge follows as many Hub pages as necessary to collect the requested number of matching GGUF repositories, stopping early only when Hugging Face has no more results. The continuation cursor also remembers an offset within a Hub page so matches are not skipped between TGAIC pages.</p>
@@ -1005,9 +1025,21 @@ vectors + lexical matches → optional reranker → coder model</pre>
 
         <div class="setupSection">
           <h3>29. Repository and project documentation</h3>
-          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0033.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
+          <p><b>Repository file convention:</b> keep the active browser application in the repository as <code>tgaic-ai-coder.html</code>. Versioned working copies such as <code>tgaic-ai-coder-v0034.html</code> are useful during development, while the versionless file is the stable file users should download and run locally.</p>
           <p>Use <b>GitHub / Docs ↗</b> directly beneath the TGAIC branding at the top of the application, or <b>GitHub / README ↗</b> in the footer, to open the public TGAIC repository. The repository contains the README, source, setup instructions, release history, and related project resources.</p>
         </div>
+
+        <div class="setupSection">
+          <h3>30. Inspect RAG sources for every answer</h3>
+          <p>When an answer used RAG, expand <b>RAG Sources Used</b> directly beneath the model response. It shows the exact source file, approximate line range, chunk token count, retrieval score, why the chunk was selected, and the raw reference text actually sent to the model.</p>
+          <p>This makes it easy to distinguish <b>retrieval failure</b> (wrong source/chunk selected) from <b>generation failure</b> (the right evidence was supplied but the model answered poorly).</p>
+        </div>
+        <div class="setupSection">
+          <h3>31. Exact filename and code-aware ranking</h3>
+          <p>If a question explicitly names an indexed file, that file now receives a strong file-level boost before chunks are ranked. Inside the candidate chunks, the bridge also applies lightweight code-intent boosts for imports, package declarations, exceptions, methods/functions/procedures, SQL, parameters, JDBC/database references, and class/interface/enum declarations.</p>
+          <p>For example, <code>What imports does GentexFindFilesCp.java use?</code> strongly favors that Java file and then boosts chunks containing <code>import</code> statements.</p>
+        </div>
+
       
     </div>
     <div class="helpActions"><button id="closeHelp" class="primary" type="button">Close</button></div>
@@ -1016,7 +1048,7 @@ vectors + lexical matches → optional reranker → coder model</pre>
 
 <script>
 (()=>{'use strict';
-const APP_VERSION='v0033';
+const APP_VERSION='v0034';
 const $=id=>document.getElementById(id);
 const ui={
   endpoint:$('endpoint'),model:$('model'),connect:$('connectBtn'),disconnect:$('disconnectBtn'),stopBridge:$('stopBridgeBtn'),badge:$('statusBadge'),
@@ -1626,7 +1658,7 @@ function renderRagSelectedFiles(){
 
   if(!ragSelectedFiles.length&&!ragIndexedFiles.length){
     if(ragMeta && Number(ragMeta.chunkCount||0)>0){
-      ui.ragFiles.textContent='Persisted RAG index is active, but this bridge did not return its file manifest. Restart with bridge v0030 or newer.';
+      ui.ragFiles.textContent='Persisted RAG index is active, but this bridge did not return its file manifest. Restart with bridge v0031 or newer.';
     }else{
       ui.ragFiles.textContent='No references are staged or indexed.';
     }
@@ -1809,6 +1841,61 @@ async function connect(){
     appendMessage('system',`Could not connect to the local model server: ${err.message||err}`);
   }finally{ui.connect.disabled=false}
 }
+
+function buildRagDiagnosticsElement(ragResult){
+  const chunks=Array.isArray(ragResult?.chunks)?ragResult.chunks.flat(Infinity).filter(Boolean):[];
+  if(!chunks.length)return null;
+
+  const wrap=document.createElement('details');
+  wrap.className='ragUsed';
+
+  const sum=document.createElement('summary');
+  const files=new Set(chunks.map(c=>c.file).filter(Boolean)).size;
+  sum.textContent=`RAG Sources Used · ${chunks.length} chunk${chunks.length===1?'':'s'} · ${Number(ragResult.tokensSelected||0).toLocaleString()} tok · ${files} file${files===1?'':'s'}`;
+  wrap.appendChild(sum);
+
+  const meta=document.createElement('div');
+  meta.className='ragUsedMeta';
+  const exact=Array.isArray(ragResult?.diagnostics?.exactFileMatches)?ragResult.diagnostics.exactFileMatches.flat(Infinity):[];
+  const signals=Array.isArray(ragResult?.diagnostics?.codeSignals)?ragResult.diagnostics.codeSignals.flat(Infinity):[];
+  const parts=[`Method: ${ragResult.retrievalMethod||'RAG retrieval'}`];
+  if(exact.length)parts.push(`Exact file: ${exact.join(', ')}`);
+  if(signals.length)parts.push(`Code signal: ${signals.join(', ')}`);
+  parts.push(`Candidates scored: ${Number(ragResult?.diagnostics?.candidateCount||0)}`);
+  meta.textContent=parts.join(' · ');
+  wrap.appendChild(meta);
+
+  chunks.forEach((c,i)=>{
+    const d=document.createElement('details');
+    d.className='ragChunk';
+
+    const s=document.createElement('summary');
+    s.textContent=`${i+1}. ${c.file||'(unknown file)'} · lines ${c.startLine||'?'}–${c.endLine||'?'} · ${Number(c.tokenCount||0).toLocaleString()} tok · score ${c.score??'—'}`;
+    d.appendChild(s);
+
+    const reasons=Array.isArray(c.reasons)?c.reasons:[];
+    if(reasons.length){
+      const rr=document.createElement('div');
+      rr.className='ragReasons';
+      rr.textContent='Why selected: '+reasons.join(', ');
+      d.appendChild(rr);
+    }
+
+    const pre=document.createElement('pre');
+    pre.textContent=String(c.text||'');
+    d.appendChild(pre);
+    wrap.appendChild(d);
+  });
+
+  return wrap;
+}
+
+function attachRagDiagnostics(messageElement,ragResult){
+  if(!messageElement||!ragResult)return;
+  const panel=buildRagDiagnosticsElement(ragResult);
+  if(panel)messageElement.appendChild(panel);
+}
+
 async function send(){
   if(!connected||controller)return;
   const text=ui.prompt.value.trim();
@@ -1876,6 +1963,7 @@ async function send(){
       }
     }
     if(!full)setMessage(out,'[No response text returned]');
+    attachRagDiagnostics(out,ragResult);
     lastAssistant=full;
     history.push({role:'user',content:text},{role:'assistant',content:full});
   }catch(err){

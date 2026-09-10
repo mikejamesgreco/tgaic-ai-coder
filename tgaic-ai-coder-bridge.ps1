@@ -901,14 +901,75 @@ function Search-RagIndex {
   $queryTokenCount = @($queryTokens.tokens).Count
   $terms = @(Get-RagTerms $query)
 
-  $scored = New-Object System.Collections.Generic.List[object]
   $queryLower = $query.ToLowerInvariant().Trim()
+
+  # Detect exact references to any indexed filename.  This is a strong
+  # file-level signal before individual chunks are ranked.
+  $exactFiles = @()
+  foreach ($f in @(Get-RagIndexedFiles)) {
+    $fullName = [string]$f.name
+    if (-not $fullName) { continue }
+    $leaf = [System.IO.Path]::GetFileName($fullName)
+
+    if ($query.IndexOf($fullName, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+        ($leaf -and $query.IndexOf($leaf, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)) {
+      $exactFiles += $fullName
+    }
+  }
+  $exactFiles = @($exactFiles | Select-Object -Unique)
+
+  # Lightweight code-aware intent signals.  These are ranking hints, not parsers.
+  $signals = @()
+  if ($queryLower -match '\bimports?\b') {
+    $signals += [pscustomobject]@{ name='imports'; patterns=@('import '); boost=38.0 }
+  }
+  if ($queryLower -match '\bpackages?\b') {
+    $signals += [pscustomobject]@{ name='package'; patterns=@('package '); boost=30.0 }
+  }
+  if ($queryLower -match '\bexceptions?\b|\berror handling\b|\bthrows?\b|\bcatch\b') {
+    $signals += [pscustomobject]@{ name='exceptions'; patterns=@('catch ','throws ','exception'); boost=24.0 }
+  }
+  if ($queryLower -match '\bmethods?\b|\bfunctions?\b|\bprocedures?\b') {
+    $signals += [pscustomobject]@{ name='methods/functions'; patterns=@('public ','private ','protected ','function ','procedure '); boost=14.0 }
+  }
+  if ($queryLower -match '\bsql\b|\bquery\b|\bselect\b|\binsert\b|\bupdate\b|\bdelete\b') {
+    $signals += [pscustomobject]@{ name='sql'; patterns=@('select ','insert ','update ','delete ',' from ',' where '); boost=22.0 }
+  }
+  if ($queryLower -match '\bparameters?\b|\barguments?\b') {
+    $signals += [pscustomobject]@{ name='parameters'; patterns=@('parameter','getparameter','param','argument'); boost=18.0 }
+  }
+  if ($queryLower -match '\bconnection\b|\bjdbc\b|\bdatabase\b') {
+    $signals += [pscustomobject]@{ name='database/jdbc'; patterns=@('connection','jdbc','preparedstatement','resultset','datasource'); boost=22.0 }
+  }
+  if ($queryLower -match '\bclass\b|\binterface\b|\benum\b') {
+    $signals += [pscustomobject]@{ name='type declaration'; patterns=@('class ','interface ','enum '); boost=16.0 }
+  }
+
+  $scored = New-Object System.Collections.Generic.List[object]
 
   foreach ($c in @($script:RagIndex)) {
     $textLower = ([string]$c.text).ToLowerInvariant()
-    $fileLower = ([string]$c.file).ToLowerInvariant()
+    $file = [string]$c.file
+    $fileLower = $file.ToLowerInvariant()
+    $leafLower = ([System.IO.Path]::GetFileName($file)).ToLowerInvariant()
     $score = 0.0
     $matched = New-Object System.Collections.Generic.List[string]
+    $reasons = New-Object System.Collections.Generic.List[string]
+
+    if ($exactFiles.Count -gt 0) {
+      if ($exactFiles -contains $file) {
+        $score += 100.0
+        $reasons.Add("exact filename match")
+      }
+      else {
+        $score -= 25.0
+      }
+    }
+
+    if ($leafLower -and $queryLower.Contains($leafLower)) {
+      $score += 45.0
+      $reasons.Add("filename mentioned")
+    }
 
     foreach ($term in $terms) {
       $termEsc = [regex]::Escape($term)
@@ -917,14 +978,26 @@ function Search-RagIndex {
 
       if ($occ -gt 0 -or $fileOcc -gt 0) {
         $matched.Add($term)
-        # Exact identifier-like matches are intentionally strong for code RAG.
         $identifierBonus = if ($term.Contains("_") -or $term.Contains(".") -or $term.Contains("$")) { 8.0 } else { 2.0 }
         $score += ($occ * 1.5) + ($fileOcc * 8.0) + $identifierBonus
+        if ($reasons.Count -lt 10) { $reasons.Add("term:$term") }
       }
     }
 
     if ($queryLower.Length -ge 8 -and $textLower.Contains($queryLower)) {
       $score += 30.0
+      $reasons.Add("exact query phrase")
+    }
+
+    foreach ($sig in $signals) {
+      $hits = 0
+      foreach ($pattern in @($sig.patterns)) {
+        if ($textLower.Contains(([string]$pattern).ToLowerInvariant())) { $hits++ }
+      }
+      if ($hits -gt 0) {
+        $score += ([double]$sig.boost + [Math]::Min(12.0, ($hits - 1) * 3.0))
+        if ($reasons.Count -lt 10) { $reasons.Add("code-signal:$($sig.name)") }
+      }
     }
 
     if ($score -gt 0) {
@@ -932,11 +1005,14 @@ function Search-RagIndex {
         chunk = $c
         score = [Math]::Round($score, 3)
         matchedTerms = $matched.ToArray()
+        reasons = $reasons.ToArray()
       })
     }
   }
 
-  $ordered = @($scored | Sort-Object @{Expression="score";Descending=$true}, @{Expression={$_.chunk.file};Descending=$false}, @{Expression={$_.chunk.startLine};Descending=$false})
+  $ordered = @($scored | Sort-Object @{Expression="score";Descending=$true},
+                                      @{Expression={$_.chunk.file};Descending=$false},
+                                      @{Expression={$_.chunk.startLine};Descending=$false})
 
   $picked = New-Object System.Collections.Generic.List[object]
   $used = 0
@@ -947,8 +1023,6 @@ function Search-RagIndex {
 
     if ($picked.Count -gt 0 -and ($used + $count) -gt $budget) { continue }
 
-    # If the best chunk alone is larger than a very small requested budget,
-    # return it anyway: chunks are already bounded by the configured target.
     $picked.Add([pscustomobject]@{
       id = $s.chunk.id
       file = $s.chunk.file
@@ -957,6 +1031,7 @@ function Search-RagIndex {
       tokenCount = $count
       score = $s.score
       matchedTerms = $s.matchedTerms
+      reasons = $s.reasons
       text = $s.chunk.text
     })
     $used += $count
@@ -966,7 +1041,7 @@ function Search-RagIndex {
 
   return @{
     ok = $true
-    retrievalMethod = "token-aware lexical code retrieval"
+    retrievalMethod = "token-aware lexical code retrieval with exact-file and code-intent ranking"
     queryTokenCount = $queryTokenCount
     queryTerms = $terms
     tokenBudget = $budget
@@ -974,6 +1049,11 @@ function Search-RagIndex {
     count = $picked.Count
     chunks = $picked.ToArray()
     indexMeta = $script:RagMeta
+    diagnostics = @{
+      exactFileMatches = @($exactFiles)
+      codeSignals = @($signals | ForEach-Object { $_.name })
+      candidateCount = [int]$ordered.Count
+    }
   }
 }
 
